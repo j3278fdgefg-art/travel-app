@@ -79,7 +79,7 @@ export default function TripsScreen() {
           <Text style={styles.greeting}>你好 👋</Text>
           <Text style={styles.headerTitle}>我的旅程</Text>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.signOutBtn}>
+        <TouchableOpacity onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} style={styles.signOutBtn}>
           <Text style={styles.signOutText}>登出</Text>
         </TouchableOpacity>
       </View>

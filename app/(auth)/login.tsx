@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -12,7 +12,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const signIn = useAuthStore((s) => s.signIn);
+  const { session, loading: authLoading, signIn } = useAuthStore();
+
+  useEffect(() => {
+    if (!authLoading && session) {
+      router.replace('/trips');
+    }
+  }, [authLoading, session]);
 
   const handleLogin = async () => {
     setErrorMsg('');
