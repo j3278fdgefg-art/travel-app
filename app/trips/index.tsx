@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, Alert, ActivityIndicator,
+  SafeAreaView, Modal, TextInput, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -149,15 +149,21 @@ export default function TripsScreen() {
 
             <View style={styles.dateRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>出發日 * (YYYY-MM-DD)</Text>
-                <TextInput style={styles.input} value={startDate} onChangeText={setStartDate}
-                  placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />
+                <Text style={styles.label}>出發日 *</Text>
+                {Platform.OS === 'web' ? (
+                  <input type="date" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} style={webDateStyle} />
+                ) : (
+                  <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />
+                )}
               </View>
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>回程日 *</Text>
-                <TextInput style={styles.input} value={endDate} onChangeText={setEndDate}
-                  placeholder="2026-04-27" placeholderTextColor={Colors.textLight} />
+                {Platform.OS === 'web' ? (
+                  <input type="date" value={endDate} onChange={(e: any) => setEndDate(e.target.value)} style={webDateStyle} />
+                ) : (
+                  <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="2026-04-27" placeholderTextColor={Colors.textLight} />
+                )}
               </View>
             </View>
 
@@ -175,6 +181,13 @@ export default function TripsScreen() {
     </SafeAreaView>
   );
 }
+
+const webDateStyle: any = {
+  height: 46, backgroundColor: Colors.background, borderRadius: 12,
+  paddingLeft: 14, paddingRight: 14, fontSize: 15, color: Colors.text,
+  border: `1px solid ${Colors.border}`, width: '100%',
+  boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

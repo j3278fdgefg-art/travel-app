@@ -218,43 +218,63 @@ export default function MembersScreen() {
           </View>
           <View style={styles.grid}>
             {/* 主辦人優先顯示 */}
-            {ownerMember && (
-              <TouchableOpacity key={ownerMember.id} style={[styles.memberCard, styles.ownerCard]} onPress={() => openEdit(ownerMember)} activeOpacity={0.7}>
-                <View style={[styles.avatarCircle, styles.ownerAvatarCircle]}>
-                  <Text style={styles.avatarEmoji}>{ownerMember.avatar_emoji}</Text>
-                </View>
-                <Text style={styles.memberName}>{ownerMember.display_name}</Text>
-                <Text style={styles.roleTag}>👑 主辦人</Text>
-                {!!ownerMember.line_id && <Text style={styles.contactTag}>💬 {ownerMember.line_id}</Text>}
-                {!!ownerMember.ig_handle && <Text style={styles.contactTag}>📸 {ownerMember.ig_handle}</Text>}
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(ownerMember)}>
-                  <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            )}
-
-            {/* 其他成員 */}
-            {nonOwnerMembers.map((m) => (
-              <TouchableOpacity key={m.id} style={styles.memberCard} onPress={() => openEdit(m)} activeOpacity={0.7}>
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarEmoji}>{m.avatar_emoji}</Text>
-                </View>
-                <Text style={styles.memberName}>{m.display_name}</Text>
-                <Text style={styles.roleTag}>✈️ 旅伴</Text>
-                {!!m.line_id && <Text style={styles.contactTag}>💬 {m.line_id}</Text>}
-                {!!m.ig_handle && <Text style={styles.contactTag}>📸 {m.ig_handle}</Text>}
-                <View style={styles.memberActions}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(m)}>
-                    <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
-                  </TouchableOpacity>
-                  {isOwner && (
-                    <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
-                      <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+            {ownerMember && (() => {
+              const canEditOwner = isOwner;
+              return (
+                <TouchableOpacity
+                  key={ownerMember.id}
+                  style={[styles.memberCard, styles.ownerCard]}
+                  onPress={() => canEditOwner && openEdit(ownerMember)}
+                  activeOpacity={canEditOwner ? 0.7 : 1}
+                >
+                  <View style={[styles.avatarCircle, styles.ownerAvatarCircle]}>
+                    <Text style={styles.avatarEmoji}>{ownerMember.avatar_emoji}</Text>
+                  </View>
+                  <Text style={styles.memberName}>{ownerMember.display_name}</Text>
+                  <Text style={styles.roleTag}>👑 主辦人</Text>
+                  {!!ownerMember.line_id && <Text style={styles.contactTag}>💬 {ownerMember.line_id}</Text>}
+                  {!!ownerMember.ig_handle && <Text style={styles.contactTag}>📸 {ownerMember.ig_handle}</Text>}
+                  {canEditOwner && (
+                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(ownerMember)}>
+                      <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
                     </TouchableOpacity>
                   )}
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })()}
+
+            {/* 其他成員 */}
+            {nonOwnerMembers.map((m) => {
+              const canEdit = isOwner || m.user_id === user?.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={styles.memberCard}
+                  onPress={() => canEdit && openEdit(m)}
+                  activeOpacity={canEdit ? 0.7 : 1}
+                >
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarEmoji}>{m.avatar_emoji}</Text>
+                  </View>
+                  <Text style={styles.memberName}>{m.display_name}</Text>
+                  <Text style={styles.roleTag}>✈️ 旅伴</Text>
+                  {!!m.line_id && <Text style={styles.contactTag}>💬 {m.line_id}</Text>}
+                  {!!m.ig_handle && <Text style={styles.contactTag}>📸 {m.ig_handle}</Text>}
+                  <View style={styles.memberActions}>
+                    {canEdit && (
+                      <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(m)}>
+                        <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    {isOwner && (
+                      <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
+                        <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
 
             {/* 新增按鈕 */}
             <TouchableOpacity style={styles.addCard} onPress={openAdd}>
@@ -299,7 +319,7 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <ScrollView style={styles.modalBox} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>{editingMember ? '編輯成員' : '新增成員'}</Text>
 
             <Text style={styles.label}>成員名稱 *</Text>
@@ -390,7 +410,7 @@ export default function MembersScreen() {
                 <Text style={styles.leaveText}>退出行程</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -437,7 +457,7 @@ const styles = StyleSheet.create({
   logDetail: { fontSize: 12, color: Colors.textSecondary, marginBottom: 2 },
   logTime: { fontSize: 11, color: Colors.textLight },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
