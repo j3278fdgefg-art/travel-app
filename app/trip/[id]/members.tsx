@@ -12,7 +12,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { TripMember } from '../../../types';
 import { supabase } from '../../../lib/supabase';
 
-const AVATARS = ['😀','👑','👨','👩','👦','👧','🧔','👴','👵','🧒','🧑','🤵','👸','🦸','🧙','👮','🧑‍💼','🧑‍🍳','🧑‍🎤'];
+const DEFAULT_AVATARS = ['😀', '👨', '👩'];
 
 // 時間窗口邀請碼（每 5 分鐘換一次）
 function inviteToken(tripId: string): string {
@@ -40,6 +40,7 @@ export default function MembersScreen() {
   const [lineId, setLineId] = useState('');
   const [igHandle, setIgHandle] = useState('');
   const [avatar, setAvatar] = useState('😀');
+  const [customEmoji, setCustomEmoji] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function MembersScreen() {
 
   const openAdd = () => {
     setEditingMember(null);
-    setName(''); setEmail(''); setLineId(''); setIgHandle(''); setAvatar('😀');
+    setName(''); setEmail(''); setLineId(''); setIgHandle(''); setAvatar('😀'); setCustomEmoji('');
     setModalVisible(true);
   };
 
@@ -89,6 +90,7 @@ export default function MembersScreen() {
     setLineId(m.line_id || '');
     setIgHandle(m.ig_handle || '');
     setAvatar(m.avatar_emoji);
+    setCustomEmoji(DEFAULT_AVATARS.includes(m.avatar_emoji) ? '' : m.avatar_emoji);
     setModalVisible(true);
   };
 
@@ -345,12 +347,33 @@ export default function MembersScreen() {
             />
 
             <Text style={styles.label}>頭像</Text>
-            <View style={styles.avatarGrid}>
-              {AVATARS.map((a) => (
-                <TouchableOpacity key={a} style={[styles.avatarBtn, avatar === a && styles.avatarBtnSelected]} onPress={() => setAvatar(a)}>
+            <View style={styles.avatarRow}>
+              {DEFAULT_AVATARS.map((a) => (
+                <TouchableOpacity
+                  key={a}
+                  style={[styles.avatarBtn, avatar === a && !customEmoji && styles.avatarBtnSelected]}
+                  onPress={() => { setAvatar(a); setCustomEmoji(''); }}
+                >
                   <Text style={styles.avatarBtnText}>{a}</Text>
                 </TouchableOpacity>
               ))}
+              {/* 自訂 emoji 輸入 */}
+              <View style={styles.customEmojiWrap}>
+                <View style={[styles.avatarBtn, styles.avatarPreview, customEmoji ? styles.avatarBtnSelected : null]}>
+                  <Text style={styles.avatarBtnText}>{customEmoji || '✏️'}</Text>
+                </View>
+                <TextInput
+                  style={styles.customEmojiInput}
+                  value={customEmoji}
+                  onChangeText={(v) => {
+                    setCustomEmoji(v);
+                    if (v.trim()) setAvatar(v.trim());
+                  }}
+                  placeholder="貼上任意 emoji"
+                  placeholderTextColor={Colors.textLight}
+                  maxLength={8}
+                />
+              </View>
             </View>
 
             <View style={styles.modalBtns}>
@@ -418,10 +441,13 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  avatarBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  avatarBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  avatarPreview: {},
   avatarBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
-  avatarBtnText: { fontSize: 24 },
+  avatarBtnText: { fontSize: 26 },
+  customEmojiWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  customEmojiInput: { flex: 1, height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 12, fontSize: 18, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   modalBtns: { flexDirection: 'row', marginTop: 24, gap: 12 },
   cancelBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
