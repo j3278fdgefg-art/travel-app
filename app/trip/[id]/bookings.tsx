@@ -233,7 +233,7 @@ export default function BookingsScreen() {
   };
 
   const renderBooking = (b: Booking) => {
-    const isMyBooking = b.created_by_user_id === user?.id;
+    const isMyBooking = !b.created_by_user_id || b.created_by_user_id === user?.id;
     return (
       <View key={b.id} style={styles.card}>
         <View style={styles.cardHeader}>
