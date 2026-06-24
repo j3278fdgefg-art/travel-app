@@ -322,12 +322,12 @@ export default function ItineraryScreen() {
         const dayNum = days[selectedDay].day_number;
         const dateStr = dayjs(days[selectedDay].date).format('M/DD');
         if (!w) {
-          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '找不到地點' : '超出預報範圍';
+          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '找不到地點' : `${dateStr} 可以預測天氣`;
           return (
             <View style={styles.weatherCard}>
               <View style={styles.weatherCardTop}>
                 <View style={styles.weatherIconBox}>
-                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '🔍' : '📅'}</Text>
+                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '🔍' : '🗓️'}</Text>
                 </View>
                 <View style={styles.weatherCardCenter}>
                   <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
