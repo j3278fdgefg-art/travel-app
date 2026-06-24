@@ -25,21 +25,29 @@ const emptyForm = () => ({
   note: '',
 });
 
-// 計算每個成員的淨餘額
-function calcBalances(expenses: Expense[], memberNames: string[]) {
+// 計算每個成員的淨餘額（從費用紀錄取人名，刪除的成員仍計入）
+function calcBalances(expenses: Expense[]) {
   const paid: Record<string, number> = {};
   const shouldPay: Record<string, number> = {};
-  memberNames.forEach((n) => { paid[n] = 0; shouldPay[n] = 0; });
 
   expenses.forEach((e) => {
     const shared: string[] = e.shared_with?.length > 0 ? e.shared_with : [e.paid_by_name];
     const twd = e.amount_twd || e.amount;
     const perPerson = twd / shared.length;
-    if (paid[e.paid_by_name] !== undefined) paid[e.paid_by_name] += twd;
-    shared.forEach((n) => { if (shouldPay[n] !== undefined) shouldPay[n] += perPerson; });
+    if (paid[e.paid_by_name] === undefined) { paid[e.paid_by_name] = 0; shouldPay[e.paid_by_name] = 0; }
+    paid[e.paid_by_name] += twd;
+    shared.forEach((n) => {
+      if (shouldPay[n] === undefined) { paid[n] = paid[n] ?? 0; shouldPay[n] = 0; }
+      shouldPay[n] += perPerson;
+    });
   });
 
-  return memberNames.map((n) => ({ name: n, paid: paid[n] ?? 0, shouldPay: shouldPay[n] ?? 0, net: (paid[n] ?? 0) - (shouldPay[n] ?? 0) }));
+  return Object.keys({ ...paid, ...shouldPay }).map((n) => ({
+    name: n,
+    paid: paid[n] ?? 0,
+    shouldPay: shouldPay[n] ?? 0,
+    net: (paid[n] ?? 0) - (shouldPay[n] ?? 0),
+  }));
 }
 
 // 最小動線分帳：貪婪配對最大債主與欠款人
@@ -181,7 +189,7 @@ export default function ExpensesScreen() {
     }
   };
 
-  const balances = calcBalances(expenses, memberNames);
+  const balances = calcBalances(expenses);
   const settlements = calcSettlement(balances);
 
   return (

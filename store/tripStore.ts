@@ -25,6 +25,7 @@ interface TripStore {
 
   fetchTrips: (userId: string) => Promise<void>;
   fetchTripById: (tripId: string) => Promise<void>;
+  updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
   setCurrentTrip: (trip: Trip) => void;
   createTrip: (data: Partial<Trip>) => Promise<Trip | null>;
   fetchMembers: (tripId: string) => Promise<void>;
@@ -98,6 +99,15 @@ export const useTripStore = create<TripStore>((set, get) => ({
   fetchTripById: async (tripId) => {
     const { data } = await supabase.from('trips').select('*').eq('id', tripId).single();
     if (data) set({ currentTrip: data });
+  },
+
+  updateTrip: async (tripId, data) => {
+    const { error } = await supabase.from('trips').update(data).eq('id', tripId);
+    if (error) console.error('updateTrip error:', error);
+    set((s) => ({
+      currentTrip: s.currentTrip?.id === tripId ? { ...s.currentTrip, ...data } : s.currentTrip,
+      trips: s.trips.map((t) => (t.id === tripId ? { ...t, ...data } : t)),
+    }));
   },
 
   setCurrentTrip: (trip) => set({ currentTrip: trip }),

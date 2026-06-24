@@ -1,5 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  SafeAreaView, Platform, ActivityIndicator, ScrollView,
+} from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
@@ -7,7 +10,8 @@ import { useTripStore } from '../../../store/tripStore';
 
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
-  const { currentTrip } = useTripStore();
+  const { currentTrip, items, fetchTripById, fetchItems, updateTrip } = useTripStore();
+  const id = params.id || currentTrip?.id || '';
   const iframeRef = useRef<any>(null);
 
   const defaultQuery = (params.q ? decodeURIComponent(params.q as string) : null)
@@ -18,6 +22,17 @@ export default function MapScreen() {
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [showPanel, setShowPanel] = useState(false);
+  const [listUrl, setListUrl] = useState('');
+  const [savingUrl, setSavingUrl] = useState(false);
+
+  useEffect(() => {
+    if (id) { fetchTripById(id); fetchItems(id); }
+  }, [id]);
+
+  useEffect(() => {
+    if (currentTrip?.map_list_url) setListUrl(currentTrip.map_list_url);
+  }, [currentTrip?.map_list_url]);
 
   useEffect(() => {
     if (params.q) {
@@ -37,8 +52,7 @@ export default function MapScreen() {
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setCurrentCoords({ lat, lng });
-        const locQuery = `${lat},${lng}`;
-        setQuery(locQuery);
+        setQuery(`${lat},${lng}`);
         setSearch('目前位置');
         setMapKey((k) => k + 1);
         setLocating(false);
@@ -49,7 +63,6 @@ export default function MapScreen() {
   };
 
   const handleNavigate = () => {
-    // 在新分頁開啟 Google Maps 導航（瀏覽器版，不跳 App）
     const dest = encodeURIComponent(query);
     const navUrl = currentCoords
       ? `https://www.google.com/maps/dir/${currentCoords.lat},${currentCoords.lng}/${dest}`
@@ -57,7 +70,24 @@ export default function MapScreen() {
     window.open(navUrl, '_blank');
   };
 
-  // 使用完整 Google Maps embed（會沿用瀏覽器 Google 帳號，支援點擊地點顯示資訊）
+  const handleSaveUrl = async () => {
+    if (!id) return;
+    setSavingUrl(true);
+    await updateTrip(id, { map_list_url: listUrl } as any);
+    setSavingUrl(false);
+  };
+
+  const handleOpenList = () => {
+    if (listUrl) window.open(listUrl, '_blank');
+  };
+
+  const searchLocation = (loc: string) => {
+    setSearch(loc); setQuery(loc); setMapKey((k) => k + 1);
+  };
+
+  // 行程地點：取有填 location 的行程項目
+  const locationItems = items.filter((item) => item.location?.trim());
+
   const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
   const mapSrc = isCoord
     ? `https://maps.google.com/maps?q=${query}&output=embed&hl=zh-TW&z=16`
@@ -78,7 +108,6 @@ export default function MapScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>地圖</Text>
-        {query !== defaultQuery && <Text style={styles.headerSub}>📍 {search}</Text>}
       </View>
 
       {/* 搜尋列 */}
@@ -96,19 +125,73 @@ export default function MapScreen() {
           <Ionicons name="search" size={18} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.locateBtn} onPress={handleLocate} disabled={locating}>
-          {locating ? <ActivityIndicator size="small" color={Colors.primary} /> : <Ionicons name="locate" size={18} color={Colors.primary} />}
+          {locating
+            ? <ActivityIndicator size="small" color={Colors.primary} />
+            : <Ionicons name="locate" size={18} color={Colors.primary} />}
         </TouchableOpacity>
         <TouchableOpacity style={styles.navBtn} onPress={handleNavigate}>
           <Ionicons name="navigate" size={18} color="#fff" />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.listBtn, showPanel && styles.listBtnActive]}
+          onPress={() => setShowPanel((v) => !v)}
+        >
+          <Ionicons name="list" size={18} color={showPanel ? '#fff' : Colors.primary} />
+        </TouchableOpacity>
       </View>
 
-      {/* 功能提示 */}
-      <View style={styles.tipsRow}>
-        <Text style={styles.tip}>📍 點地圖地標查看資訊</Text>
-        <Text style={styles.tip}>🧭 導航開新分頁</Text>
-        <Text style={styles.tip}>❤️ 喜愛點需登入 Google</Text>
-      </View>
+      {/* 可收合面板 */}
+      {showPanel && (
+        <View style={styles.panel}>
+          {/* 行程地點快速搜尋 */}
+          {locationItems.length > 0 && (
+            <>
+              <Text style={styles.panelTitle}>📍 行程地點</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                <View style={styles.chipRow}>
+                  {locationItems.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.locationChip}
+                      onPress={() => searchLocation(item.location!)}
+                    >
+                      <Text style={styles.chipTime}>{item.time || ''}</Text>
+                      <Text style={styles.chipTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.chipLoc} numberOfLines={1}>{item.location}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          )}
+          {locationItems.length === 0 && (
+            <Text style={styles.noLocations}>行程中沒有填寫地點的項目</Text>
+          )}
+
+          {/* 共編清單連結 */}
+          <Text style={[styles.panelTitle, { marginTop: 12 }]}>🔗 Google 共編清單</Text>
+          <View style={styles.urlRow}>
+            <TextInput
+              style={styles.urlInput}
+              value={listUrl}
+              onChangeText={setListUrl}
+              placeholder="貼上 Google Maps 清單連結..."
+              placeholderTextColor={Colors.textLight}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.saveUrlBtn} onPress={handleSaveUrl} disabled={savingUrl}>
+              {savingUrl
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="save-outline" size={16} color="#fff" />}
+            </TouchableOpacity>
+            {!!listUrl && (
+              <TouchableOpacity style={styles.openUrlBtn} onPress={handleOpenList}>
+                <Ionicons name="open-outline" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* 地圖 */}
       <View style={styles.mapContainer}>
@@ -123,10 +206,6 @@ export default function MapScreen() {
           allow="geolocation"
         />
       </View>
-
-      <Text style={styles.hint}>
-        💡 地圖點擊地標後，資訊卡會在地圖內顯示。若已在瀏覽器登入 Google，喜愛清單會自動同步。
-      </Text>
     </SafeAreaView>
   );
 }
@@ -135,16 +214,27 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  headerSub: { fontSize: 12, color: Colors.primary, marginTop: 2 },
   searchRow: { flexDirection: 'row', paddingHorizontal: 12, gap: 6, marginBottom: 6, marginTop: 8 },
   searchInput: { flex: 1, height: 42, backgroundColor: Colors.card, borderRadius: 12, paddingHorizontal: 14, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   searchBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   locateBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   navBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
-  tipsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 12, marginBottom: 6 },
-  tip: { fontSize: 10, color: Colors.textSecondary },
+  listBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  listBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  panel: { marginHorizontal: 12, marginBottom: 8, backgroundColor: Colors.card, borderRadius: 16, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  panelTitle: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
+  chipScroll: { maxHeight: 90 },
+  chipRow: { flexDirection: 'row', gap: 8 },
+  locationChip: { backgroundColor: Colors.background, borderRadius: 12, padding: 10, minWidth: 100, maxWidth: 140, borderWidth: 1, borderColor: Colors.border },
+  chipTime: { fontSize: 10, color: Colors.primary, fontWeight: '600', marginBottom: 2 },
+  chipTitle: { fontSize: 12, fontWeight: '600', color: Colors.text },
+  chipLoc: { fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
+  noLocations: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 8 },
+  urlRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  urlInput: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 13, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
+  saveUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  openUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
   mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6 },
-  hint: { fontSize: 11, color: Colors.textSecondary, textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },

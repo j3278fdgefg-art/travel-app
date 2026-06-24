@@ -43,7 +43,7 @@ const emptyForm = () => ({
 
 export default function BookingsScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, bookings, members, fetchBookings, fetchMembers, addBooking } = useTripStore();
+  const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking } = useTripStore();
   const id = params.id || currentTrip?.id || '';
   const [activeTab, setActiveTab] = useState<Booking['type']>('flight');
   const [modalVisible, setModalVisible] = useState(false);
@@ -54,7 +54,7 @@ export default function BookingsScreen() {
   const arrMinRef = useRef<any>(null);
 
   useEffect(() => {
-    if (id) { fetchBookings(id); fetchMembers(id); }
+    if (id) { fetchTripById(id); fetchBookings(id); fetchMembers(id); }
   }, [id]);
 
   const filtered = bookings.filter((b) => b.type === activeTab);
@@ -100,6 +100,14 @@ export default function BookingsScreen() {
       };
     } else if (activeTab === 'hotel') {
       if (!form.title) { alert('請填寫飯店名稱'); return; }
+      if (currentTrip?.start_date && currentTrip?.end_date) {
+        if (form.check_in && (form.check_in < currentTrip.start_date || form.check_in > currentTrip.end_date)) {
+          alert(`Check-in 日期不在行程時間內\n行程：${currentTrip.start_date} ～ ${currentTrip.end_date}`); return;
+        }
+        if (form.check_out && (form.check_out < currentTrip.start_date || form.check_out > currentTrip.end_date)) {
+          alert(`Check-out 日期不在行程時間內\n行程：${currentTrip.start_date} ～ ${currentTrip.end_date}`); return;
+        }
+      }
       payload = { ...payload, title: form.title, check_in: form.check_in, check_out: form.check_out };
     } else if (activeTab === 'car') {
       if (!form.title) { alert('請填寫租車資訊'); return; }
