@@ -104,6 +104,12 @@ const DEFAULT_ITEM_TYPES = ['🏨', '🍽️', '📸'];
 const LEGACY_EMOJI: Record<string, string> = {
   transport: '🚗', accommodation: '🏨', food: '🍽️', attraction: '📸', other: '📌',
 };
+const EMOJI_TO_DB_TYPE: Record<string, string> = {
+  '🚗': 'transport', '🏨': 'accommodation', '🍽️': 'food', '📸': 'attraction', '📌': 'other',
+};
+function toDbType(emoji: string): string {
+  return EMOJI_TO_DB_TYPE[emoji] ?? emoji;
+}
 const PALETTE = ['#5A8AAD', '#9B6BBF', '#D4A853', '#5AAD6B', '#AD5A5A', '#5A9E9E', '#AD7B5A'];
 
 function typeEmoji(t: string) { return LEGACY_EMOJI[t] || t; }
@@ -263,13 +269,13 @@ export default function ItineraryScreen() {
     if (editingItem) {
       await updateItineraryItem(editingItem.id, {
         time: form.time, title: form.title, location: form.location,
-        note: form.note, type: form.type,
+        note: form.note, type: toDbType(form.type) as any,
       });
     } else {
       await addItineraryItem({
         trip_id: id, day_id: day.id,
         time: form.time, title: form.title, location: form.location,
-        note: form.note, type: form.type,
+        note: form.note, type: toDbType(form.type) as any,
         order_index: currentDayItems.length,
       });
     }
