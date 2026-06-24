@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, Platform,
+  SafeAreaView, Modal, TextInput, Platform, useWindowDimensions,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +42,7 @@ const emptyForm = () => ({
 });
 
 export default function BookingsScreen() {
+  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking } = useTripStore();
   const id = params.id || currentTrip?.id || '';
@@ -385,7 +386,7 @@ export default function BookingsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalWrapper}>
+          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>新增{BOOKING_TYPES[activeTab]}</Text>
 
@@ -468,7 +469,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: Colors.textSecondary },
   fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1 },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },

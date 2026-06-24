@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput,
+  SafeAreaView, Modal, TextInput, useWindowDimensions,
 } from 'react-native';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ const DEFAULT_AVATARS = ['😀', '👨', '👩'];
 
 
 export default function MembersScreen() {
+  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { members, currentTrip, activityLogs, fetchMembers, fetchActivityLogs, fetchTripById, addMember, removeMember, logActivity } = useTripStore();
   const { user } = useAuthStore();
@@ -314,7 +315,7 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalWrapper}>
+          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.9 }]}>
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>{editingMember ? '編輯成員' : '新增成員'}</Text>
 
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
   logDetail: { fontSize: 12, color: Colors.textSecondary, marginBottom: 2 },
   logTime: { fontSize: 11, color: Colors.textLight },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1 },
   modalContent: { padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },

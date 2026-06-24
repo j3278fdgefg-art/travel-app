@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   SafeAreaView, Modal, TextInput, Alert, ActivityIndicator, Platform, ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -31,6 +32,7 @@ const webDateStyle: any = {
 };
 
 export default function TripsScreen() {
+  const { height: winHeight } = useWindowDimensions();
   const { user, signOut } = useAuthStore();
   const { trips, loading, fetchTrips, createTrip, setCurrentTrip, deleteTrip } = useTripStore();
   const [modalVisible, setModalVisible] = useState(false);
@@ -158,7 +160,7 @@ export default function TripsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalWrapper}>
+          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>建立新旅程</Text>
 
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', bottom: 32, alignSelf: 'center', backgroundColor: Colors.primary, borderRadius: 30, paddingVertical: 16, paddingHorizontal: 32, shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1 },
   modalContent: { padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 20, textAlign: 'center' },
