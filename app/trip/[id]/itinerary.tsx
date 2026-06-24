@@ -168,6 +168,9 @@ export default function ItineraryScreen() {
   const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherFailed, setWeatherFailed] = useState(false);
+  const [weatherOverride, setWeatherOverride] = useState('');
+  const [weatherInput, setWeatherInput] = useState('');
+  const [showWeatherInput, setShowWeatherInput] = useState(false);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -180,7 +183,14 @@ export default function ItineraryScreen() {
   }, [user]);
 
   useEffect(() => {
-    const dest = currentTrip?.destination || currentTrip?.name;
+    if (!id) return;
+    const saved = localStorage.getItem(`weather_loc_${id}`) || '';
+    setWeatherOverride(saved);
+    setWeatherInput(saved);
+  }, [id]);
+
+  useEffect(() => {
+    const dest = weatherOverride || currentTrip?.destination || currentTrip?.name;
     if (!dest) return;
     setWeatherLoading(true);
     setWeatherFailed(false);
@@ -191,7 +201,7 @@ export default function ItineraryScreen() {
       setWeatherFailed(list.length === 0);
       setWeatherLoading(false);
     });
-  }, [currentTrip?.destination, currentTrip?.name]);
+  }, [weatherOverride, currentTrip?.destination, currentTrip?.name]);
 
   const currentDayItems = items
     .filter((i) => days[selectedDay] && i.day_id === days[selectedDay].id)
@@ -312,19 +322,54 @@ export default function ItineraryScreen() {
         const dayNum = days[selectedDay].day_number;
         const dateStr = dayjs(days[selectedDay].date).format('M/DD');
         if (!w) {
-          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '無法取得天氣' : '超出預報範圍';
+          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '找不到地點' : '超出預報範圍';
           return (
             <View style={styles.weatherCard}>
               <View style={styles.weatherCardTop}>
                 <View style={styles.weatherIconBox}>
-                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '❌' : '📅'}</Text>
+                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '🔍' : '📅'}</Text>
                 </View>
                 <View style={styles.weatherCardCenter}>
                   <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
                   <Text style={styles.weatherDate}>{dateStr}</Text>
                 </View>
-                <Text style={styles.weatherCondition}>{noDataLabel}</Text>
+                {!weatherLoading && weatherFailed && (
+                  <TouchableOpacity onPress={() => setShowWeatherInput((v) => !v)} style={styles.weatherSetBtn}>
+                    <Text style={styles.weatherSetBtnText}>設定地名</Text>
+                  </TouchableOpacity>
+                )}
+                {!weatherLoading && !weatherFailed && (
+                  <Text style={styles.weatherCondition}>{noDataLabel}</Text>
+                )}
               </View>
+              {showWeatherInput && (
+                <View style={styles.weatherInputRow}>
+                  <TextInput
+                    style={styles.weatherInputField}
+                    value={weatherInput}
+                    onChangeText={setWeatherInput}
+                    placeholder="輸入英文地名 e.g. Busan"
+                    placeholderTextColor={Colors.textLight}
+                    autoFocus
+                    returnKeyType="search"
+                    onSubmitEditing={() => {
+                      const v = weatherInput.trim();
+                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                      setShowWeatherInput(false);
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.weatherSearchBtn}
+                    onPress={() => {
+                      const v = weatherInput.trim();
+                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                      setShowWeatherInput(false);
+                    }}
+                  >
+                    <Text style={styles.weatherSearchBtnText}>搜尋</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           );
         }
@@ -349,7 +394,40 @@ export default function ItineraryScreen() {
               {!!w.sunset && <Text style={styles.weatherInfoItem}>🌅 {w.sunset}</Text>}
               <Text style={styles.weatherInfoItem}>🌂 {w.rain}%</Text>
               <Text style={styles.weatherInfoItem}>👕 {clothing}</Text>
+              <TouchableOpacity onPress={() => setShowWeatherInput((v) => !v)}>
+                <Text style={[styles.weatherInfoItem, { color: Colors.textLight }]}>🔍</Text>
+              </TouchableOpacity>
             </View>
+            {showWeatherInput && (
+              <View style={styles.weatherInputRow}>
+                <TextInput
+                  style={styles.weatherInputField}
+                  value={weatherInput}
+                  onChangeText={setWeatherInput}
+                  placeholder="輸入英文地名 e.g. Okayama"
+                  placeholderTextColor={Colors.textLight}
+                  autoFocus
+                  returnKeyType="search"
+                  onSubmitEditing={() => {
+                    const v = weatherInput.trim();
+                    if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                    else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
+                    setShowWeatherInput(false);
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.weatherSearchBtn}
+                  onPress={() => {
+                    const v = weatherInput.trim();
+                    if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                    else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
+                    setShowWeatherInput(false);
+                  }}
+                >
+                  <Text style={styles.weatherSearchBtnText}>搜尋</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         );
       })()}
@@ -560,6 +638,12 @@ const styles = StyleSheet.create({
   weatherTemp: { fontSize: 15, fontWeight: '700', color: Colors.text, marginTop: 2 },
   weatherCardBottom: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
   weatherInfoItem: { fontSize: 13, color: Colors.textSecondary },
+  weatherSetBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: Colors.primaryLight },
+  weatherSetBtnText: { fontSize: 12, color: Colors.primaryDark, fontWeight: '600' },
+  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
+  weatherSearchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.primary },
+  weatherSearchBtnText: { fontSize: 13, color: '#fff', fontWeight: '600' },
   timelineRow: { flexDirection: 'row', marginBottom: 8 },
   timeCol: { width: 50, paddingTop: 10 },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
