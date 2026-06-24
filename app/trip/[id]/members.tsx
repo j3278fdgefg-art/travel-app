@@ -124,6 +124,7 @@ export default function MembersScreen() {
 
       await logActivity(id, actorName, '編輯成員', `${oldName}${newName !== oldName ? ` → ${newName}` : ''}`);
       await fetchMembers(id);
+      await fetchActivityLogs(id);
     } else {
       const { error } = await supabase.from('trip_members').insert({
         trip_id: id, display_name: name.trim(), avatar_emoji: avatar, role: 'member',
@@ -132,6 +133,7 @@ export default function MembersScreen() {
       if (error) { alert('新增失敗：' + error.message); return; }
       await logActivity(id, actorName, '新增成員', name.trim());
       await fetchMembers(id);
+      await fetchActivityLogs(id);
     }
     setModalVisible(false);
   };

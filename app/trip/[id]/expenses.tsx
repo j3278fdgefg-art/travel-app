@@ -408,18 +408,16 @@ export default function ExpensesScreen() {
                           </View>
                         )}
 
-                        {isOwner && (
-                          <View style={styles.detailActions}>
-                            <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(e)}>
-                              <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
-                              <Text style={styles.editBtnText}>編輯</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(e)}>
-                              <Ionicons name="trash-outline" size={14} color={Colors.danger} />
-                              <Text style={styles.deleteBtnText}>刪除</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
+                        <View style={styles.detailActions}>
+                          <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(e)}>
+                            <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+                            <Text style={styles.editBtnText}>編輯</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(e)}>
+                            <Ionicons name="trash-outline" size={14} color={Colors.danger} />
+                            <Text style={styles.deleteBtnText}>刪除</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -436,12 +434,9 @@ export default function ExpensesScreen() {
         )}
       </ScrollView>
 
-      {isOwner && (
-        <TouchableOpacity style={styles.fab} onPress={openAdd}>
-          <Ionicons name="add" size={28} color="#fff" />
-        </TouchableOpacity>
-      )}
-      {!isOwner && <Text style={styles.ownerNote}>僅主辦人可新增／編輯消費</Text>}
+      <TouchableOpacity style={styles.fab} onPress={openAdd}>
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
 
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>

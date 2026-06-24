@@ -45,6 +45,17 @@ interface DayWeather {
   min: number;
   rain: number;
   code: number;
+  sunset: string;
+}
+
+function getClothing(max: number, min: number): string {
+  const avg = (max + min) / 2;
+  if (avg >= 28) return '短袖';
+  if (avg >= 23) return '薄長袖';
+  if (avg >= 18) return '薄長袖＋輕薄外套';
+  if (avg >= 13) return '長袖＋外套';
+  if (avg >= 7) return '厚外套';
+  return '羽絨衣';
 }
 
 async function geocode(name: string): Promise<{ latitude: number; longitude: number } | null> {
@@ -71,17 +82,18 @@ async function fetchWeather(destination: string): Promise<DayWeather[]> {
     const { latitude, longitude } = geo;
     const wRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
-      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunset` +
       `&timezone=auto&forecast_days=16`
     );
     const wData = await wRes.json();
-    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weather_code } = wData.daily;
+    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weather_code, sunset } = wData.daily;
     return time.map((date: string, i: number) => ({
       date,
       max: Math.round(temperature_2m_max[i]),
       min: Math.round(temperature_2m_min[i]),
       rain: precipitation_probability_max[i] ?? 0,
       code: weather_code[i] ?? 0,
+      sunset: sunset?.[i] ? sunset[i].slice(11, 16) : '',
     }));
   } catch {
     return [];
@@ -283,34 +295,45 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
-      {/* 天氣列（固定在頂部，隨選擇日期更新） */}
+      {/* 天氣卡（固定在頂部，隨選擇日期更新） */}
       {currentTrip && days[selectedDay] && (() => {
         const w = weatherMap[days[selectedDay].date];
         const dest = currentTrip.destination || currentTrip.name || '';
+        const dayNum = days[selectedDay].day_number;
+        const dateStr = dayjs(days[selectedDay].date).format('M/DD');
         if (!w) {
           return (
-            <View style={styles.weatherWidget}>
-              <Text style={styles.weatherWidgetEmoji}>{weatherLoading ? '🌡️' : '📅'}</Text>
-              <View style={styles.weatherWidgetMid}>
-                <Text style={styles.weatherWidgetLabel}>
-                  {weatherLoading ? '天氣載入中…' : '超出 16 天預報範圍'}
-                </Text>
-                {!!dest && <Text style={styles.weatherWidgetDest} numberOfLines={1}>📍 {dest}</Text>}
+            <View style={styles.weatherCard}>
+              <View style={styles.weatherCardTop}>
+                <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : '📅'}</Text>
+                <View style={styles.weatherCardCenter}>
+                  <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
+                  <Text style={styles.weatherDate}>{dateStr}</Text>
+                </View>
+                <Text style={styles.weatherCondition}>{weatherLoading ? '載入中…' : '超出預報範圍'}</Text>
               </View>
             </View>
           );
         }
         const { emoji, label } = getWmo(w.code);
+        const clothing = getClothing(w.max, w.min);
         return (
-          <View style={styles.weatherWidget}>
-            <Text style={styles.weatherWidgetEmoji}>{emoji}</Text>
-            <View style={styles.weatherWidgetMid}>
-              <Text style={styles.weatherWidgetLabel}>{label}</Text>
-              {!!dest && <Text style={styles.weatherWidgetDest} numberOfLines={1}>📍 {dest}</Text>}
+          <View style={styles.weatherCard}>
+            <View style={styles.weatherCardTop}>
+              <Text style={styles.weatherEmoji}>{emoji}</Text>
+              <View style={styles.weatherCardCenter}>
+                <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
+                <Text style={styles.weatherDate}>{dateStr}</Text>
+              </View>
+              <View style={styles.weatherCardRight}>
+                <Text style={styles.weatherCondition}>{label}</Text>
+                <Text style={styles.weatherTemp}>{w.max}° / {w.min}°</Text>
+              </View>
             </View>
-            <View style={styles.weatherWidgetRight}>
-              <Text style={styles.weatherWidgetTemp}>{w.min}°–{w.max}°C</Text>
-              <Text style={styles.weatherWidgetRain}>☂ {w.rain}%</Text>
+            <View style={styles.weatherCardBottom}>
+              {!!w.sunset && <Text style={styles.weatherInfoItem}>🌅 {w.sunset}</Text>}
+              <Text style={styles.weatherInfoItem}>🌂 {w.rain}%</Text>
+              <Text style={styles.weatherInfoItem}>👕 {clothing}</Text>
             </View>
           </View>
         );
@@ -510,14 +533,17 @@ const styles = StyleSheet.create({
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  weatherWidget: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
-  weatherWidgetEmoji: { fontSize: 28 },
-  weatherWidgetMid: { flex: 1, minWidth: 0 },
-  weatherWidgetLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  weatherWidgetDest: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
-  weatherWidgetRight: { alignItems: 'flex-end' },
-  weatherWidgetTemp: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  weatherWidgetRain: { fontSize: 12, color: Colors.info, marginTop: 2 },
+  weatherCard: { backgroundColor: Colors.card, marginHorizontal: 12, marginTop: 8, marginBottom: 4, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  weatherCardTop: { flexDirection: 'row', alignItems: 'center' },
+  weatherEmoji: { fontSize: 34, marginRight: 10 },
+  weatherCardCenter: { flex: 1, minWidth: 0 },
+  weatherDayTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  weatherDate: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  weatherCardRight: { alignItems: 'flex-end' },
+  weatherCondition: { fontSize: 13, color: Colors.textSecondary },
+  weatherTemp: { fontSize: 15, fontWeight: '700', color: Colors.text, marginTop: 2 },
+  weatherCardBottom: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  weatherInfoItem: { fontSize: 13, color: Colors.textSecondary },
   timelineRow: { flexDirection: 'row', marginBottom: 8 },
   timeCol: { width: 50, paddingTop: 10 },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
