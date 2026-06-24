@@ -158,7 +158,8 @@ export default function TripsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalBox} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+          <View style={styles.modalWrapper}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>建立新旅程</Text>
 
             <Text style={styles.label}>選擇圖示</Text>
@@ -232,6 +233,7 @@ export default function TripsScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -264,7 +266,8 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', bottom: 32, alignSelf: 'center', backgroundColor: Colors.primary, borderRadius: 30, paddingVertical: 16, paddingHorizontal: 32, shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '92%' },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
+  modalContent: { padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 20, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },

@@ -4,10 +4,8 @@ import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
-import { verifyInviteToken } from '../trip/[id]/members';
-
 export default function JoinTripScreen() {
-  const { id, t, ot } = useGlobalSearchParams<{ id: string; t?: string; ot?: string }>();
+  const { id, ot } = useGlobalSearchParams<{ id: string; ot?: string }>();
   const { user, loading: authLoading } = useAuthStore();
   const router = useRouter();
   const [trip, setTrip] = useState<any>(null);
@@ -25,13 +23,11 @@ export default function JoinTripScreen() {
     const { data: tripData } = await supabase.from('trips').select('*').eq('id', id).single();
     if (!tripData) { setStatus('error'); return; }
 
-    // 一次性連結驗證
-    if (ot) {
-      if (!tripData.single_use_token || tripData.single_use_token !== ot) {
-        setStatus('error_once'); return;
-      }
-    } else if (!t || !verifyInviteToken(id, t)) {
-      // 時間窗口邀請碼驗證
+    // 一次性連結驗證（5 分鐘有效）
+    if (!ot || !tripData.single_use_token || tripData.single_use_token !== ot) {
+      setStatus('error'); return;
+    }
+    if (tripData.invite_expires_at && new Date(tripData.invite_expires_at) < new Date()) {
       setStatus('error'); return;
     }
 
@@ -82,9 +78,8 @@ export default function JoinTripScreen() {
       error = res.error;
     }
 
-    if (!error && ot) {
-      // 使用後清除一次性 token
-      await supabase.from('trips').update({ single_use_token: null } as any).eq('id', id);
+    if (!error) {
+      await supabase.from('trips').update({ single_use_token: null, invite_expires_at: null } as any).eq('id', id);
     }
 
     setJoining(false);
@@ -108,20 +103,7 @@ export default function JoinTripScreen() {
       <SafeAreaView style={styles.center}>
         <Text style={styles.emoji}>⏰</Text>
         <Text style={styles.title}>連結已失效</Text>
-        <Text style={styles.sub}>邀請連結每 5 分鐘更新一次{'\n'}請向主辦人索取新連結</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.replace('/trips' as any)}>
-          <Text style={styles.btnText}>回首頁</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  if (status === 'error_once') {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.emoji}>🎫</Text>
-        <Text style={styles.title}>一次性連結已失效</Text>
-        <Text style={styles.sub}>此連結已被使用或已過期{'\n'}請向主辦人索取新連結</Text>
+        <Text style={styles.sub}>此邀請連結已被使用或已過期{'\n'}請向主辦人索取新連結</Text>
         <TouchableOpacity style={styles.btn} onPress={() => router.replace('/trips' as any)}>
           <Text style={styles.btnText}>回首頁</Text>
         </TouchableOpacity>

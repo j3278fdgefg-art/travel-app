@@ -14,15 +14,6 @@ import { supabase } from '../../../lib/supabase';
 
 const DEFAULT_AVATARS = ['😀', '👨', '👩'];
 
-// 時間窗口邀請碼（每 5 分鐘換一次）
-function inviteToken(tripId: string): string {
-  const win = Math.floor(Date.now() / 300000);
-  return btoa(`${tripId}:${win}`).replace(/[=+/]/g, '');
-}
-export function verifyInviteToken(tripId: string, token: string): boolean {
-  const win = Math.floor(Date.now() / 300000);
-  return [win, win - 1].some((w) => btoa(`${tripId}:${w}`).replace(/[=+/]/g, '') === token);
-}
 
 export default function MembersScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
@@ -42,7 +33,6 @@ export default function MembersScreen() {
   const [avatar, setAvatar] = useState('😀');
   const [customEmoji, setCustomEmoji] = useState('');
   const [copied, setCopied] = useState(false);
-  const [copiedOnce, setCopiedOnce] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -160,26 +150,28 @@ export default function MembersScreen() {
   };
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://travel-app-app.vercel.app';
-  const joinUrl = `${origin}/join/${id}?t=${inviteToken(id)}`;
-  const shareMessage = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${joinUrl}`;
-  const encodedMsg = encodeURIComponent(shareMessage);
 
-  const shareLine = () => window.open(`https://line.me/R/msg/text/?${encodedMsg}`, '_blank');
-
-  const copyLink = async () => {
-    await navigator.clipboard.writeText(joinUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const generateLink = async () => {
+    if (!id) return null;
+    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    await supabase.from('trips').update({ single_use_token: token, invite_expires_at: expiresAt } as any).eq('id', id);
+    return `${origin}/join/${id}?ot=${token}`;
   };
 
-  const generateOneTimeLink = async () => {
-    if (!id) return;
-    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    await supabase.from('trips').update({ single_use_token: token } as any).eq('id', id);
-    const url = `${origin}/join/${id}?ot=${token}`;
+  const shareLine = async () => {
+    const url = await generateLink();
+    if (!url) return;
+    const msg = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${url}`;
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const copyLink = async () => {
+    const url = await generateLink();
+    if (!url) return;
     await navigator.clipboard.writeText(url);
-    setCopiedOnce(true);
-    setTimeout(() => setCopiedOnce(false), 3000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const actionIcon = (action: string) => {
@@ -207,25 +199,20 @@ export default function MembersScreen() {
             <Text style={styles.syncText}>雲端即時同步中</Text>
           </View>
 
-          {/* 分享按鈕列 */}
-          <View style={styles.shareRow}>
-            <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
-              <Text style={styles.shareIcon}>💬</Text>
-              <Text style={styles.shareBtnText}>LINE 分享</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
-              <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
-              <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
-            </TouchableOpacity>
-          </View>
+          {/* 分享按鈕列（僅主辦人） */}
           {isOwner && (
-            <TouchableOpacity style={[styles.shareBtn, styles.onceBtn]} onPress={generateOneTimeLink}>
-              <Text style={styles.shareIcon}>{copiedOnce ? '✅' : '🎫'}</Text>
-              <Text style={styles.shareBtnText}>{copiedOnce ? '已複製一次性連結' : '一次性連結'}</Text>
-            </TouchableOpacity>
+            <View style={styles.shareRow}>
+              <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
+                <Text style={styles.shareIcon}>💬</Text>
+                <Text style={styles.shareBtnText}>LINE 分享</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
+                <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
+                <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
+              </TouchableOpacity>
+            </View>
           )}
-          {copied && <Text style={styles.copiedHint}>邀請連結已複製！（5 分鐘有效）</Text>}
-          {copiedOnce && <Text style={styles.copiedHint}>一次性連結已複製！用過即失效</Text>}
+          {copied && <Text style={styles.copiedHint}>邀請連結已複製！（5 分鐘有效，使用後失效）</Text>}
         </View>
 
         {/* 成員清單 */}
@@ -327,7 +314,8 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalBox} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          <View style={styles.modalWrapper}>
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>{editingMember ? '編輯成員' : '新增成員'}</Text>
 
             <Text style={styles.label}>成員名稱 *</Text>
@@ -426,6 +414,7 @@ export default function MembersScreen() {
               </TouchableOpacity>
             )}
           </ScrollView>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -472,11 +461,11 @@ const styles = StyleSheet.create({
   logDetail: { fontSize: 12, color: Colors.textSecondary, marginBottom: 2 },
   logTime: { fontSize: 11, color: Colors.textLight },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
+  modalContent: { padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  onceBtn: { marginTop: 8, alignSelf: 'center' },
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   avatarBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   avatarBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
