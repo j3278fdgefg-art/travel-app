@@ -23,7 +23,11 @@ export default function LoginScreen() {
     setLoading(true);
     const error = await signIn(email.trim(), password);
     setLoading(false);
-    if (error) setErrorMsg(error);
+    if (error) {
+      setErrorMsg(error);
+    } else {
+      router.replace('/trips');
+    }
   };
 
   return (
