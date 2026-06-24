@@ -42,6 +42,28 @@ function calcBalances(expenses: Expense[], memberNames: string[]) {
   return memberNames.map((n) => ({ name: n, paid: paid[n] ?? 0, shouldPay: shouldPay[n] ?? 0, net: (paid[n] ?? 0) - (shouldPay[n] ?? 0) }));
 }
 
+// 最小動線分帳：貪婪配對最大債主與欠款人
+function calcSettlement(balances: { name: string; net: number }[]) {
+  const creditors = balances.filter((b) => b.net > 0.5).map((b) => ({ ...b }));
+  const debtors = balances.filter((b) => b.net < -0.5).map((b) => ({ ...b }));
+  creditors.sort((a, b) => b.net - a.net);
+  debtors.sort((a, b) => a.net - b.net);
+
+  const txns: { from: string; to: string; amount: number }[] = [];
+  let i = 0, j = 0;
+  while (i < creditors.length && j < debtors.length) {
+    const amount = Math.min(creditors[i].net, -debtors[j].net);
+    if (amount > 0.5) {
+      txns.push({ from: debtors[j].name, to: creditors[i].name, amount: Math.round(amount) });
+    }
+    creditors[i].net -= amount;
+    debtors[j].net += amount;
+    if (creditors[i].net < 0.5) i++;
+    if (-debtors[j].net < 0.5) j++;
+  }
+  return txns;
+}
+
 export default function ExpensesScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, expenses, members, fetchExpenses, fetchMembers, fetchTripById, addExpense, deleteExpense, updateExpense, logActivity } = useTripStore();
@@ -160,6 +182,7 @@ export default function ExpensesScreen() {
   };
 
   const balances = calcBalances(expenses, memberNames);
+  const settlements = calcSettlement(balances);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -183,7 +206,7 @@ export default function ExpensesScreen() {
       {/* 分帳結算 */}
       {showSplit && (
         <View style={styles.splitCard}>
-          <Text style={styles.splitTitle}>💰 分帳結算</Text>
+          <Text style={styles.splitTitle}>💰 各人餘額</Text>
           {balances.map((b) => (
             <View key={b.name} style={styles.splitRow}>
               <Text style={styles.splitName}>{b.name}</Text>
@@ -197,9 +220,25 @@ export default function ExpensesScreen() {
               </Text>
             </View>
           ))}
-          <Text style={styles.splitHint}>
-            正數 = 別人欠他 ｜ 負數 = 他欠別人
-          </Text>
+          <Text style={styles.splitHint}>正數 = 別人欠他 ｜ 負數 = 他欠別人</Text>
+
+          {settlements.length > 0 && (
+            <>
+              <View style={styles.settleDivider} />
+              <Text style={styles.settleTitle}>🧾 結算方式（最少動線）</Text>
+              {settlements.map((txn, idx) => (
+                <View key={idx} style={styles.settleRow}>
+                  <Text style={styles.settleFrom}>{txn.from}</Text>
+                  <Text style={styles.settleArrow}>→</Text>
+                  <Text style={styles.settleTo}>{txn.to}</Text>
+                  <Text style={styles.settleAmt}>NT${txn.amount.toLocaleString()}</Text>
+                </View>
+              ))}
+            </>
+          )}
+          {settlements.length === 0 && (
+            <Text style={[styles.splitHint, { marginTop: 8, color: Colors.success }]}>✅ 已全部結清</Text>
+          )}
         </View>
       )}
 
@@ -472,6 +511,13 @@ const styles = StyleSheet.create({
   netNegative: { color: Colors.danger },
   netZero: { color: Colors.textSecondary },
   splitHint: { fontSize: 10, color: Colors.textLight, marginTop: 6, textAlign: 'center' },
+  settleDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 10 },
+  settleTitle: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
+  settleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  settleFrom: { fontSize: 13, color: Colors.danger, fontWeight: '600', minWidth: 50 },
+  settleArrow: { fontSize: 14, color: Colors.textLight },
+  settleTo: { fontSize: 13, color: Colors.success, fontWeight: '600', flex: 1 },
+  settleAmt: { fontSize: 14, fontWeight: '700', color: Colors.text },
   filterScroll: { maxHeight: 48, marginBottom: 6 },
   filterRow: { paddingHorizontal: 16, gap: 6, alignItems: 'center' },
   filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },

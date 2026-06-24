@@ -123,7 +123,14 @@ export const useTripStore = create<TripStore>((set, get) => ({
       .from('trip_members')
       .select('*')
       .eq('trip_id', tripId);
-    set({ members: data || [] });
+    // 去重：同名只保留第一筆（防止 owner 被重複加入）
+    const seen = new Set<string>();
+    const unique = (data || []).filter((m) => {
+      if (seen.has(m.display_name)) return false;
+      seen.add(m.display_name);
+      return true;
+    });
+    set({ members: unique });
   },
 
   fetchDays: async (tripId) => {
