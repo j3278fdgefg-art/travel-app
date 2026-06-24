@@ -267,6 +267,27 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
+      {/* 天氣列（固定在頂部，隨選擇日期更新） */}
+      {days[selectedDay] && (() => {
+        const w = weatherMap[days[selectedDay].date];
+        if (!w) return null;
+        const { emoji, label } = getWmo(w.code);
+        const dest = currentTrip?.destination || currentTrip?.name || '';
+        return (
+          <View style={styles.weatherWidget}>
+            <Text style={styles.weatherWidgetEmoji}>{emoji}</Text>
+            <View style={styles.weatherWidgetMid}>
+              <Text style={styles.weatherWidgetLabel}>{label}</Text>
+              {!!dest && <Text style={styles.weatherWidgetDest} numberOfLines={1}>📍 {dest}</Text>}
+            </View>
+            <View style={styles.weatherWidgetRight}>
+              <Text style={styles.weatherWidgetTemp}>{w.min}°–{w.max}°C</Text>
+              <Text style={styles.weatherWidgetRain}>☂ {w.rain}%</Text>
+            </View>
+          </View>
+        );
+      })()}
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
         {days.map((day, idx) => {
           const d = dayjs(day.date);
@@ -281,23 +302,6 @@ export default function ItineraryScreen() {
       </ScrollView>
 
       <ScrollView style={styles.timeline} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* 天氣條 */}
-        {days[selectedDay] && (() => {
-          const w = weatherMap[days[selectedDay].date];
-          if (!w) return null;
-          const { emoji, label } = getWmo(w.code);
-          return (
-            <View style={styles.weatherBar}>
-              <Text style={styles.weatherEmoji}>{emoji}</Text>
-              <Text style={styles.weatherLabel}>{label}</Text>
-              <Text style={styles.weatherTemp}>{w.min}°～{w.max}°C</Text>
-              <View style={styles.weatherRainWrap}>
-                <Text style={styles.weatherRainIcon}>☂️</Text>
-                <Text style={styles.weatherRain}>{w.rain}%</Text>
-              </View>
-            </View>
-          );
-        })()}
 
         {currentDayItems.length === 0 ? (
           <View style={styles.emptyDay}>
@@ -478,13 +482,14 @@ const styles = StyleSheet.create({
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  weatherBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, gap: 8, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-  weatherEmoji: { fontSize: 22 },
-  weatherLabel: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
-  weatherTemp: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  weatherRainWrap: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 8 },
-  weatherRainIcon: { fontSize: 13 },
-  weatherRain: { fontSize: 13, color: Colors.info, fontWeight: '600' },
+  weatherWidget: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10 },
+  weatherWidgetEmoji: { fontSize: 28 },
+  weatherWidgetMid: { flex: 1, minWidth: 0 },
+  weatherWidgetLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  weatherWidgetDest: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  weatherWidgetRight: { alignItems: 'flex-end' },
+  weatherWidgetTemp: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  weatherWidgetRain: { fontSize: 12, color: Colors.info, marginTop: 2 },
   timelineRow: { flexDirection: 'row', marginBottom: 8 },
   timeCol: { width: 50, paddingTop: 10 },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
