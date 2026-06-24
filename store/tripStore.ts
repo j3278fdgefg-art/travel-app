@@ -65,12 +65,33 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   fetchTrips: async (userId) => {
     set({ loading: true });
-    const { data } = await supabase
+    // 自己建立的行程
+    const { data: ownedTrips } = await supabase
       .from('trips')
       .select('*')
-      .or(`owner_id.eq.${userId}`)
-      .order('start_date', { ascending: true });
-    set({ trips: data || [], loading: false });
+      .eq('owner_id', userId);
+
+    // 被邀請加入的行程（trip_members 有 user_id 紀錄）
+    const { data: memberRows } = await supabase
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', userId)
+      .neq('role', 'owner');
+
+    const memberTripIds = (memberRows || []).map((r: any) => r.trip_id);
+    let sharedTrips: any[] = [];
+    if (memberTripIds.length > 0) {
+      const { data } = await supabase
+        .from('trips')
+        .select('*')
+        .in('id', memberTripIds);
+      sharedTrips = data || [];
+    }
+
+    const all = [...(ownedTrips || []), ...sharedTrips];
+    const unique = all.filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i);
+    unique.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    set({ trips: unique, loading: false });
   },
 
   fetchTripById: async (tripId) => {

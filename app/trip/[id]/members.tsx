@@ -83,17 +83,30 @@ export default function MembersScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) return;
+
+    // 名稱不能重複
+    const duplicate = members.some(
+      (m) => m.display_name.trim() === name.trim() && (!editingMember || m.id !== editingMember.id)
+    );
+    if (duplicate) {
+      alert('已有相同名稱的成員，請使用不同名稱');
+      return;
+    }
+
     if (editingMember) {
-      await supabase.from('trip_members').update({
+      const { error } = await supabase.from('trip_members').update({
         display_name: name.trim(), avatar_emoji: avatar,
         email: email.trim() || null, line_id: lineId.trim() || null, ig_handle: igHandle.trim() || null,
       }).eq('id', editingMember.id);
+      if (error) { alert('儲存失敗：' + error.message); return; }
       await fetchMembers(id);
     } else {
-      await addMember({
+      const { error } = await supabase.from('trip_members').insert({
         trip_id: id, display_name: name.trim(), avatar_emoji: avatar, role: 'member',
         email: email.trim() || null, line_id: lineId.trim() || null, ig_handle: igHandle.trim() || null,
       } as any);
+      if (error) { alert('新增失敗：' + error.message); return; }
+      await fetchMembers(id);
     }
     setModalVisible(false);
   };
@@ -102,22 +115,16 @@ export default function MembersScreen() {
     if (window.confirm(`確定要移除 ${m.display_name}？`)) removeMember(m.id);
   };
 
-  const shareMessage = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！一起來計畫這趟旅行吧 ✈️`;
+  const joinUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/join/${id}`
+    : `https://travel-app-app.vercel.app/join/${id}`;
+  const shareMessage = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${joinUrl}`;
   const encodedMsg = encodeURIComponent(shareMessage);
 
   const shareLine = () => window.open(`https://line.me/R/msg/text/?${encodedMsg}`, '_blank');
 
-  const shareIG = async () => {
-    if (navigator.share) {
-      try { await navigator.share({ text: shareMessage }); return; } catch {}
-    }
-    await navigator.clipboard.writeText(shareMessage);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
   const copyLink = async () => {
-    await navigator.clipboard.writeText(shareMessage);
+    await navigator.clipboard.writeText(joinUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -151,18 +158,14 @@ export default function MembersScreen() {
           <View style={styles.shareRow}>
             <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
               <Text style={styles.shareIcon}>💬</Text>
-              <Text style={styles.shareBtnText}>LINE</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.shareBtn} onPress={shareIG}>
-              <Text style={styles.shareIcon}>📸</Text>
-              <Text style={styles.shareBtnText}>Instagram</Text>
+              <Text style={styles.shareBtnText}>LINE 分享</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
               <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
-              <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製訊息'}</Text>
+              <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
             </TouchableOpacity>
           </View>
-          {copied && <Text style={styles.copiedHint}>已複製！貼到 IG 私訊或其他 App 傳送</Text>}
+          {copied && <Text style={styles.copiedHint}>邀請連結已複製！傳給旅伴後他們點連結即可加入</Text>}
         </View>
 
         {/* 成員清單 */}

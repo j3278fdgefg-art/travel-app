@@ -25,6 +25,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="trip/[id]" />
         <Stack.Screen name="trips" />
+        <Stack.Screen name="join" />
       </Stack>
     </>
   );
