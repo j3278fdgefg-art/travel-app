@@ -47,28 +47,41 @@ interface DayWeather {
   code: number;
 }
 
+async function geocode(name: string): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const res = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh`
+    );
+    const data = await res.json();
+    if (data.results?.length) return data.results[0];
+  } catch {}
+  return null;
+}
+
 async function fetchWeather(destination: string): Promise<DayWeather[]> {
   try {
-    const geoRes = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=zh`
-    );
-    const geoData = await geoRes.json();
-    if (!geoData.results?.length) return [];
-    const { latitude, longitude } = geoData.results[0];
+    // 先嘗試完整目的地，失敗的話取第一個詞再試一次
+    let geo = await geocode(destination);
+    if (!geo) {
+      const firstWord = destination.split(/[,，、・\s\/]/)[0].trim();
+      if (firstWord && firstWord !== destination) geo = await geocode(firstWord);
+    }
+    if (!geo) return [];
 
+    const { latitude, longitude } = geo;
     const wRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
-      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code` +
       `&timezone=auto&forecast_days=16`
     );
     const wData = await wRes.json();
-    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weathercode } = wData.daily;
+    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weather_code } = wData.daily;
     return time.map((date: string, i: number) => ({
       date,
       max: Math.round(temperature_2m_max[i]),
       min: Math.round(temperature_2m_min[i]),
       rain: precipitation_probability_max[i] ?? 0,
-      code: weathercode[i] ?? 0,
+      code: weather_code[i] ?? 0,
     }));
   } catch {
     return [];
@@ -135,6 +148,7 @@ export default function ItineraryScreen() {
   const [locationInput, setLocationInput] = useState('');
   const [urlDetected, setUrlDetected] = useState(false);
   const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -149,10 +163,12 @@ export default function ItineraryScreen() {
   useEffect(() => {
     const dest = currentTrip?.destination || currentTrip?.name;
     if (!dest) return;
+    setWeatherLoading(true);
     fetchWeather(dest).then((list) => {
       const map: Record<string, DayWeather> = {};
       list.forEach((d) => { map[d.date] = d; });
       setWeatherMap(map);
+      setWeatherLoading(false);
     });
   }, [currentTrip?.destination, currentTrip?.name]);
 
@@ -268,11 +284,22 @@ export default function ItineraryScreen() {
       </View>
 
       {/* 天氣列（固定在頂部，隨選擇日期更新） */}
-      {days[selectedDay] && (() => {
+      {currentTrip && days[selectedDay] && (() => {
         const w = weatherMap[days[selectedDay].date];
-        if (!w) return null;
+        const dest = currentTrip.destination || currentTrip.name || '';
+        if (!w) {
+          if (!weatherLoading) return null;
+          return (
+            <View style={styles.weatherWidget}>
+              <Text style={styles.weatherWidgetEmoji}>🌡️</Text>
+              <View style={styles.weatherWidgetMid}>
+                <Text style={styles.weatherWidgetLabel}>天氣載入中…</Text>
+                {!!dest && <Text style={styles.weatherWidgetDest} numberOfLines={1}>📍 {dest}</Text>}
+              </View>
+            </View>
+          );
+        }
         const { emoji, label } = getWmo(w.code);
-        const dest = currentTrip?.destination || currentTrip?.name || '';
         return (
           <View style={styles.weatherWidget}>
             <Text style={styles.weatherWidgetEmoji}>{emoji}</Text>
