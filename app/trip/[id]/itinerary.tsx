@@ -288,12 +288,13 @@ export default function ItineraryScreen() {
         const w = weatherMap[days[selectedDay].date];
         const dest = currentTrip.destination || currentTrip.name || '';
         if (!w) {
-          if (!weatherLoading) return null;
           return (
             <View style={styles.weatherWidget}>
-              <Text style={styles.weatherWidgetEmoji}>🌡️</Text>
+              <Text style={styles.weatherWidgetEmoji}>{weatherLoading ? '🌡️' : '📅'}</Text>
               <View style={styles.weatherWidgetMid}>
-                <Text style={styles.weatherWidgetLabel}>天氣載入中…</Text>
+                <Text style={styles.weatherWidgetLabel}>
+                  {weatherLoading ? '天氣載入中…' : '超出 16 天預報範圍'}
+                </Text>
                 {!!dest && <Text style={styles.weatherWidgetDest} numberOfLines={1}>📍 {dest}</Text>}
               </View>
             </View>
