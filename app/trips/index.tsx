@@ -14,7 +14,7 @@ const TRIP_EMOJIS = ['✈️','🗺️','🏖️','🏔️','🏯','🌸','🍜'
 
 export default function TripsScreen() {
   const { user, signOut } = useAuthStore();
-  const { trips, loading, fetchTrips, createTrip, setCurrentTrip } = useTripStore();
+  const { trips, loading, fetchTrips, createTrip, setCurrentTrip, deleteTrip } = useTripStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
@@ -51,24 +51,39 @@ export default function TripsScreen() {
     }
   };
 
+  const handleDelete = (item: Trip) => {
+    if (item.owner_id !== user?.id) return;
+    if (window.confirm(`確定要刪除「${item.name}」？此操作無法復原。`)) {
+      deleteTrip(item.id);
+    }
+  };
+
   const renderTrip = ({ item }: { item: Trip }) => {
     const start = dayjs(item.start_date);
     const end = dayjs(item.end_date);
     const days = end.diff(start, 'day') + 1;
+    const isOwner = item.owner_id === user?.id;
     return (
-      <TouchableOpacity style={styles.card} onPress={() => openTrip(item)}>
-        <View style={styles.cardLeft}>
-          <Text style={styles.cardEmoji}>{item.cover_emoji}</Text>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          {item.destination ? <Text style={styles.cardSub}>📍 {item.destination}</Text> : null}
-          <Text style={styles.cardDate}>
-            {start.format('MM/DD')} - {end.format('MM/DD')} · {days} 天
-          </Text>
-        </View>
-        <Text style={styles.arrow}>›</Text>
-      </TouchableOpacity>
+      <View style={styles.cardWrap}>
+        <TouchableOpacity style={styles.card} onPress={() => openTrip(item)} activeOpacity={0.8}>
+          <View style={styles.cardLeft}>
+            <Text style={styles.cardEmoji}>{item.cover_emoji}</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            {item.destination ? <Text style={styles.cardSub}>📍 {item.destination}</Text> : null}
+            <Text style={styles.cardDate}>
+              {start.format('MM/DD')} - {end.format('MM/DD')} · {days} 天
+            </Text>
+          </View>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
+        {isOwner && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+            <Text style={styles.deleteBtnText}>🗑️</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
@@ -172,12 +187,19 @@ const styles = StyleSheet.create({
   signOutBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.border, borderRadius: 10 },
   signOutText: { color: Colors.textSecondary, fontSize: 13 },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 },
+  cardWrap: { marginBottom: 12, position: 'relative' },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
-    borderRadius: 16, padding: 16, marginBottom: 12,
+    borderRadius: 16, padding: 16,
     shadowColor: Colors.shadow, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
+  deleteBtn: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: '#FEE2E2', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  deleteBtnText: { fontSize: 14 },
   cardLeft: {
     width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.background,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,

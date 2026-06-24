@@ -41,6 +41,7 @@ interface TripStore {
   addMember: (member: Partial<TripMember>) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
   updateMemberPermission: (id: string, canEdit: boolean) => Promise<void>;
+  deleteTrip: (id: string) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   deleteChecklistItem: (id: string) => Promise<void>;
   updateChecklistItem: (id: string, content: string) => Promise<void>;
@@ -222,6 +223,17 @@ export const useTripStore = create<TripStore>((set, get) => ({
   removeMember: async (id) => {
     await supabase.from('trip_members').delete().eq('id', id);
     set((s) => ({ members: s.members.filter((m) => m.id !== id) }));
+  },
+
+  deleteTrip: async (id) => {
+    await supabase.from('trip_members').delete().eq('trip_id', id);
+    await supabase.from('expenses').delete().eq('trip_id', id);
+    await supabase.from('checklist_items').delete().eq('trip_id', id);
+    await supabase.from('bookings').delete().eq('trip_id', id);
+    await supabase.from('itinerary_items').delete().eq('trip_id', id);
+    await supabase.from('itinerary_days').delete().eq('trip_id', id);
+    await supabase.from('trips').delete().eq('id', id);
+    set((s) => ({ trips: s.trips.filter((t) => t.id !== id) }));
   },
 
   deleteExpense: async (id) => {
