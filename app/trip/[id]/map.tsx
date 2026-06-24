@@ -168,8 +168,8 @@ export default function MapScreen() {
             <Text style={styles.noLocations}>行程中沒有填寫地點的項目</Text>
           )}
 
-          {/* 共編清單連結 */}
-          <Text style={[styles.panelTitle, { marginTop: 12 }]}>🔗 Google 共編清單</Text>
+          {/* 檢視清單連結 */}
+          <Text style={[styles.panelTitle, { marginTop: 12 }]}>🔗 Google 檢視清單</Text>
           <View style={styles.urlRow}>
             <TextInput
               style={styles.urlInput}
