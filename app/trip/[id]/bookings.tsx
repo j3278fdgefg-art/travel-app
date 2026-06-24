@@ -263,7 +263,7 @@ export default function BookingsScreen() {
         <TextInput style={[styles.input, { marginTop: 6 }]} value={form.to_terminal} onChangeText={(v) => setField('to_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
 
         <View style={styles.timePairRow}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.label}>出發時間</Text>
             <TimeInput
               hourVal={form.dep_hour} minVal={form.dep_min}
@@ -273,7 +273,7 @@ export default function BookingsScreen() {
             />
           </View>
           <View style={{ width: 12 }} />
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.label}>抵達時間</Text>
             <TimeInput
               hourVal={form.arr_hour} minVal={form.arr_min}
@@ -476,10 +476,10 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   rowFields: { flexDirection: 'row', alignItems: 'flex-end' },
-  timePairRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  timeInput: { flex: 1, height: 50, backgroundColor: Colors.background, borderRadius: 14, fontSize: 20, fontWeight: '700', color: Colors.text, borderWidth: 1, borderColor: Colors.border, textAlign: 'center' },
-  timeSep: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  timePairRow: { flexDirection: 'row', alignItems: 'flex-start', flexShrink: 1 },
+  timeRow: { flexDirection: 'row', alignItems: 'center' },
+  timeInput: { flex: 1, minWidth: 0, height: 50, backgroundColor: Colors.background, borderRadius: 14, fontSize: 20, fontWeight: '700', color: Colors.text, borderWidth: 1, borderColor: Colors.border, textAlign: 'center' },
+  timeSep: { fontSize: 24, fontWeight: '700', color: Colors.text, marginHorizontal: 8 },
   memberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   memberChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   memberChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
