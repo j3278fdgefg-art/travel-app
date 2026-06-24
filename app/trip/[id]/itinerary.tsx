@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Modal, TextInput,
@@ -55,8 +55,11 @@ export default function ItineraryScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [timeHour, setTimeHour] = useState('');
+  const [timeMin, setTimeMin] = useState('');
   const [locationInput, setLocationInput] = useState('');
   const [urlDetected, setUrlDetected] = useState(false);
+  const minInputRef = useRef<any>(null);
 
   useEffect(() => { if (id) { fetchDays(id); fetchItems(id); } }, [id]);
 
@@ -80,9 +83,16 @@ export default function ItineraryScreen() {
     }
   };
 
+  const applyTime = (h: string, m: string) => {
+    const hh = h.padStart(2, '0');
+    const mm = m.padStart(2, '0');
+    setField('time', `${hh}:${mm}`);
+  };
+
   const openAdd = () => {
     setEditingItem(null);
     setForm(emptyForm());
+    setTimeHour(''); setTimeMin('');
     setLocationInput('');
     setUrlDetected(false);
     setModalVisible(true);
@@ -90,6 +100,8 @@ export default function ItineraryScreen() {
 
   const openEdit = (item: ItineraryItem) => {
     setEditingItem(item);
+    const [h = '', m = ''] = (item.time || '').split(':');
+    setTimeHour(h); setTimeMin(m);
     setForm({
       time: item.time,
       title: item.title,
@@ -223,8 +235,42 @@ export default function ItineraryScreen() {
               </View>
             </ScrollView>
 
-            <Text style={styles.label}>時間 * (HH:MM)</Text>
-            <TextInput style={styles.input} value={form.time} onChangeText={(v) => setField('time', v)} placeholder="18:00" placeholderTextColor={Colors.textLight} />
+            <Text style={styles.label}>時間 *</Text>
+            <View style={styles.timeRow}>
+              <TextInput
+                style={styles.timeInput}
+                value={timeHour}
+                onChangeText={(v) => {
+                  const num = v.replace(/\D/g, '').slice(0, 2);
+                  if (num !== '' && Number(num) > 23) return;
+                  setTimeHour(num);
+                  applyTime(num, timeMin);
+                  if (num.length === 2) minInputRef.current?.focus();
+                }}
+                placeholder="09"
+                placeholderTextColor={Colors.textLight}
+                keyboardType="numeric"
+                maxLength={2}
+                textAlign="center"
+              />
+              <Text style={styles.timeSep}>:</Text>
+              <TextInput
+                ref={minInputRef}
+                style={styles.timeInput}
+                value={timeMin}
+                onChangeText={(v) => {
+                  const num = v.replace(/\D/g, '').slice(0, 2);
+                  if (num !== '' && Number(num) > 59) return;
+                  setTimeMin(num);
+                  applyTime(timeHour, num);
+                }}
+                placeholder="00"
+                placeholderTextColor={Colors.textLight}
+                keyboardType="numeric"
+                maxLength={2}
+                textAlign="center"
+              />
+            </View>
 
             <Text style={styles.label}>名稱 *</Text>
             <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="VIA INN 岡山 入住" placeholderTextColor={Colors.textLight} />
@@ -306,6 +352,9 @@ const styles = StyleSheet.create({
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   urlDetectedBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },
   urlDetectedText: { fontSize: 12, color: Colors.success, flex: 1 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timeInput: { flex: 1, height: 60, backgroundColor: Colors.background, borderRadius: 14, fontSize: 28, fontWeight: '700', color: Colors.text, borderWidth: 1, borderColor: Colors.border, textAlign: 'center' },
+  timeSep: { fontSize: 32, fontWeight: '700', color: Colors.text, marginBottom: 2 },
   typeRow: { flexDirection: 'row', gap: 8 },
   typeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   typeBtnSelected: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
