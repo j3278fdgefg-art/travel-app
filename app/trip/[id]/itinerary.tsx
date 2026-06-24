@@ -10,6 +10,70 @@ import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { ItineraryItem } from '../../../types';
 
+const WMO_EMOJI: Record<number, { emoji: string; label: string }> = {
+  0: { emoji: '☀️', label: '晴天' },
+  1: { emoji: '🌤️', label: '大致晴' },
+  2: { emoji: '⛅', label: '局部雲' },
+  3: { emoji: '☁️', label: '陰天' },
+  45: { emoji: '🌫️', label: '霧' },
+  48: { emoji: '🌫️', label: '霧凇' },
+  51: { emoji: '🌦️', label: '毛毛雨' },
+  53: { emoji: '🌦️', label: '毛毛雨' },
+  55: { emoji: '🌧️', label: '濃毛毛雨' },
+  61: { emoji: '🌧️', label: '小雨' },
+  63: { emoji: '🌧️', label: '中雨' },
+  65: { emoji: '🌧️', label: '大雨' },
+  71: { emoji: '🌨️', label: '小雪' },
+  73: { emoji: '🌨️', label: '中雪' },
+  75: { emoji: '❄️', label: '大雪' },
+  80: { emoji: '🌦️', label: '陣雨' },
+  81: { emoji: '🌧️', label: '陣雨' },
+  82: { emoji: '⛈️', label: '暴雨' },
+  95: { emoji: '⛈️', label: '雷雨' },
+  96: { emoji: '⛈️', label: '雷雨冰雹' },
+  99: { emoji: '⛈️', label: '強雷雨' },
+};
+
+function getWmo(code: number) {
+  return WMO_EMOJI[code] ?? WMO_EMOJI[Math.floor(code / 10) * 10] ?? { emoji: '🌡️', label: '' };
+}
+
+interface DayWeather {
+  date: string;
+  max: number;
+  min: number;
+  rain: number;
+  code: number;
+}
+
+async function fetchWeather(destination: string): Promise<DayWeather[]> {
+  try {
+    const geoRes = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=zh`
+    );
+    const geoData = await geoRes.json();
+    if (!geoData.results?.length) return [];
+    const { latitude, longitude } = geoData.results[0];
+
+    const wRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode` +
+      `&timezone=auto&forecast_days=16`
+    );
+    const wData = await wRes.json();
+    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weathercode } = wData.daily;
+    return time.map((date: string, i: number) => ({
+      date,
+      max: Math.round(temperature_2m_max[i]),
+      min: Math.round(temperature_2m_min[i]),
+      rain: precipitation_probability_max[i] ?? 0,
+      code: weathercode[i] ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 const ITEM_TYPES = [
   { key: 'transport', label: '交通', emoji: '🚗' },
   { key: 'accommodation', label: '住宿', emoji: '🏨' },
@@ -59,9 +123,20 @@ export default function ItineraryScreen() {
   const [timeMin, setTimeMin] = useState('');
   const [locationInput, setLocationInput] = useState('');
   const [urlDetected, setUrlDetected] = useState(false);
+  const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
   const minInputRef = useRef<any>(null);
 
   useEffect(() => { if (id) { fetchDays(id); fetchItems(id); } }, [id]);
+
+  useEffect(() => {
+    const dest = currentTrip?.destination || currentTrip?.name;
+    if (!dest) return;
+    fetchWeather(dest).then((list) => {
+      const map: Record<string, DayWeather> = {};
+      list.forEach((d) => { map[d.date] = d; });
+      setWeatherMap(map);
+    });
+  }, [currentTrip?.destination, currentTrip?.name]);
 
   const currentDayItems = items
     .filter((i) => days[selectedDay] && i.day_id === days[selectedDay].id)
@@ -172,6 +247,24 @@ export default function ItineraryScreen() {
       </ScrollView>
 
       <ScrollView style={styles.timeline} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* 天氣條 */}
+        {days[selectedDay] && (() => {
+          const w = weatherMap[days[selectedDay].date];
+          if (!w) return null;
+          const { emoji, label } = getWmo(w.code);
+          return (
+            <View style={styles.weatherBar}>
+              <Text style={styles.weatherEmoji}>{emoji}</Text>
+              <Text style={styles.weatherLabel}>{label}</Text>
+              <Text style={styles.weatherTemp}>{w.min}°～{w.max}°C</Text>
+              <View style={styles.weatherRainWrap}>
+                <Text style={styles.weatherRainIcon}>☂️</Text>
+                <Text style={styles.weatherRain}>{w.rain}%</Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {currentDayItems.length === 0 ? (
           <View style={styles.emptyDay}>
             <Text style={styles.emptyEmoji}>📅</Text>
@@ -323,7 +416,14 @@ const styles = StyleSheet.create({
   dayBtnLabelSelected: { color: '#fff' },
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
-  timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  weatherBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, gap: 8, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  weatherEmoji: { fontSize: 22 },
+  weatherLabel: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  weatherTemp: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  weatherRainWrap: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 8 },
+  weatherRainIcon: { fontSize: 13 },
+  weatherRain: { fontSize: 13, color: Colors.info, fontWeight: '600' },
   timelineRow: { flexDirection: 'row', marginBottom: 8 },
   timeCol: { width: 50, paddingTop: 10 },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
