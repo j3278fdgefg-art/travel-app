@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { useAuthStore } from '../../../store/authStore';
 import { ItineraryItem } from '../../../types';
 
 const WMO_EMOJI: Record<number, { emoji: string; label: string }> = {
@@ -74,18 +75,26 @@ async function fetchWeather(destination: string): Promise<DayWeather[]> {
   }
 }
 
-const ITEM_TYPES = [
-  { key: 'transport', label: '交通', emoji: '🚗' },
-  { key: 'accommodation', label: '住宿', emoji: '🏨' },
-  { key: 'food', label: '餐飲', emoji: '🍽️' },
-  { key: 'attraction', label: '景點', emoji: '📸' },
-  { key: 'other', label: '其他', emoji: '📌' },
-] as const;
-
-const DOT_COLORS: Record<string, string> = {
-  transport: '#5A8AAD', accommodation: '#9B6BBF',
-  food: '#D4A853', attraction: '#5AAD6B', other: '#AD5A5A',
+const DEFAULT_ITEM_TYPES = ['🏨', '🍽️', '📸'];
+const LEGACY_EMOJI: Record<string, string> = {
+  transport: '🚗', accommodation: '🏨', food: '🍽️', attraction: '📸', other: '📌',
 };
+const PALETTE = ['#5A8AAD', '#9B6BBF', '#D4A853', '#5AAD6B', '#AD5A5A', '#5A9E9E', '#AD7B5A'];
+
+function typeEmoji(t: string) { return LEGACY_EMOJI[t] || t; }
+function emojiColor(e: string) {
+  let h = 0;
+  for (let i = 0; i < e.length; i++) h = e.charCodeAt(i) + ((h << 5) - h);
+  return PALETTE[Math.abs(h) % PALETTE.length];
+}
+
+function loadItemTypes(userId: string): string[] {
+  try { const s = localStorage.getItem(`item_types_${userId}`); return s ? JSON.parse(s) : DEFAULT_ITEM_TYPES; }
+  catch { return DEFAULT_ITEM_TYPES; }
+}
+function saveItemTypes(userId: string, list: string[]) {
+  localStorage.setItem(`item_types_${userId}`, JSON.stringify(list));
+}
 
 // 從 Google Maps URL 解析地點名稱和搜尋關鍵字
 function parseGoogleMapsUrl(url: string): { placeName: string; searchQuery: string } | null {
@@ -107,12 +116,13 @@ function parseGoogleMapsUrl(url: string): { placeName: string; searchQuery: stri
 
 const emptyForm = () => ({
   time: '', title: '', location: '', locationUrl: '', note: '',
-  type: 'attraction' as ItineraryItem['type'],
+  type: '📸',
 });
 
 export default function ItineraryScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, days, items, fetchDays, fetchItems, addItineraryItem, deleteItineraryItem, updateItineraryItem } = useTripStore();
+  const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem } = useTripStore();
+  const { user } = useAuthStore();
   const id = params.id || currentTrip?.id || '';
 
   const [selectedDay, setSelectedDay] = useState(0);
@@ -124,9 +134,16 @@ export default function ItineraryScreen() {
   const [locationInput, setLocationInput] = useState('');
   const [urlDetected, setUrlDetected] = useState(false);
   const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
+  const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
+  const [addingType, setAddingType] = useState(false);
+  const [newTypeInput, setNewTypeInput] = useState('');
   const minInputRef = useRef<any>(null);
 
-  useEffect(() => { if (id) { fetchDays(id); fetchItems(id); } }, [id]);
+  useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); } }, [id]);
+
+  useEffect(() => {
+    if (user) setItemTypes(loadItemTypes(user.id));
+  }, [user]);
 
   useEffect(() => {
     const dest = currentTrip?.destination || currentTrip?.name;
@@ -162,6 +179,22 @@ export default function ItineraryScreen() {
     const hh = h.padStart(2, '0');
     const mm = m.padStart(2, '0');
     setField('time', `${hh}:${mm}`);
+  };
+
+  const handleAddType = () => {
+    const e = newTypeInput.trim();
+    if (e && !itemTypes.includes(e)) {
+      const next = [...itemTypes, e];
+      setItemTypes(next);
+      if (user) saveItemTypes(user.id, next);
+    }
+    setNewTypeInput(''); setAddingType(false);
+  };
+
+  const handleRemoveType = (e: string) => {
+    const next = itemTypes.filter((x) => x !== e);
+    setItemTypes(next);
+    if (user) saveItemTypes(user.id, next);
   };
 
   const openAdd = () => {
@@ -278,12 +311,12 @@ export default function ItineraryScreen() {
                 <Text style={styles.timeText}>{item.time}</Text>
               </View>
               <View style={styles.dotCol}>
-                <View style={[styles.dot, { backgroundColor: DOT_COLORS[item.type] }]} />
+                <View style={[styles.dot, { backgroundColor: emojiColor(typeEmoji(item.type)) }]} />
                 {idx < currentDayItems.length - 1 && <View style={styles.line} />}
               </View>
               <View style={styles.itemCard}>
                 <View style={styles.itemRow}>
-                  <Text style={styles.itemEmoji}>{ITEM_TYPES.find((t) => t.key === item.type)?.emoji}</Text>
+                  <Text style={styles.itemEmoji}>{typeEmoji(item.type)}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemTitle}>{item.title}</Text>
                     {item.location ? (
@@ -318,15 +351,40 @@ export default function ItineraryScreen() {
             <Text style={styles.modalTitle}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
 
             <Text style={styles.label}>類型</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.typeRow}>
-                {ITEM_TYPES.map((t) => (
-                  <TouchableOpacity key={t.key} style={[styles.typeBtn, form.type === t.key && styles.typeBtnSelected]} onPress={() => setField('type', t.key)}>
-                    <Text>{t.emoji} {t.label}</Text>
+            <View style={styles.typeRow}>
+              {itemTypes.map((e) => (
+                <View key={e} style={styles.typeBtnWrap}>
+                  <TouchableOpacity
+                    style={[styles.typeBtn, form.type === e && styles.typeBtnSelected]}
+                    onPress={() => setField('type', e)}
+                  >
+                    <Text style={styles.typeBtnEmoji}>{e}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+                  <TouchableOpacity style={styles.typeRemove} onPress={() => handleRemoveType(e)}>
+                    <Text style={styles.typeRemoveText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {addingType ? (
+                <View style={styles.typeAddRow}>
+                  <TextInput
+                    style={styles.typeAddInput}
+                    value={newTypeInput}
+                    onChangeText={setNewTypeInput}
+                    placeholder="emoji"
+                    maxLength={4}
+                    autoFocus
+                  />
+                  <TouchableOpacity style={styles.typeConfirmBtn} onPress={handleAddType}>
+                    <Text style={styles.typeConfirmText}>✓</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.typeAddBtn} onPress={() => setAddingType(true)}>
+                  <Text style={styles.typeAddBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <Text style={styles.label}>時間 *</Text>
             <View style={styles.timeRow}>
@@ -455,9 +513,19 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   timeInput: { flex: 1, height: 60, backgroundColor: Colors.background, borderRadius: 14, fontSize: 28, fontWeight: '700', color: Colors.text, borderWidth: 1, borderColor: Colors.border, textAlign: 'center' },
   timeSep: { fontSize: 32, fontWeight: '700', color: Colors.text, marginBottom: 2 },
-  typeRow: { flexDirection: 'row', gap: 8 },
-  typeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  typeBtnSelected: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
+  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  typeBtnWrap: { position: 'relative' },
+  typeBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  typeBtnEmoji: { fontSize: 24 },
+  typeBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
+  typeRemove: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.danger, justifyContent: 'center', alignItems: 'center' },
+  typeRemoveText: { color: '#fff', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  typeAddBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  typeAddBtnText: { fontSize: 22, color: Colors.textSecondary },
+  typeAddRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typeAddInput: { width: 56, height: 48, backgroundColor: Colors.background, borderRadius: 12, textAlign: 'center', fontSize: 20, color: Colors.text, borderWidth: 1, borderColor: Colors.primary },
+  typeConfirmBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  typeConfirmText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', marginTop: 24, gap: 12 },
   cancelBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   cancelText: { color: Colors.textSecondary, fontSize: 16 },

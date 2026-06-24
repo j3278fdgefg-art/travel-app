@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, Alert, ActivityIndicator, Platform,
+  SafeAreaView, Modal, TextInput, Alert, ActivityIndicator, Platform, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -10,7 +10,25 @@ import { useAuthStore } from '../../store/authStore';
 import { useTripStore } from '../../store/tripStore';
 import { Trip } from '../../types';
 
-const TRIP_EMOJIS = ['✈️','🗺️','🏖️','🏔️','🏯','🌸','🍜','🚗','🛳️','🎌'];
+const DEFAULT_TRIP_EMOJIS = ['✈️', '🚗', '🗺️'];
+const today = dayjs().format('YYYY-MM-DD');
+
+function loadUserEmojis(userId: string): string[] {
+  try {
+    const s = localStorage.getItem(`trip_icons_${userId}`);
+    return s ? JSON.parse(s) : DEFAULT_TRIP_EMOJIS;
+  } catch { return DEFAULT_TRIP_EMOJIS; }
+}
+function saveUserEmojis(userId: string, list: string[]) {
+  localStorage.setItem(`trip_icons_${userId}`, JSON.stringify(list));
+}
+
+const webDateStyle: any = {
+  height: 46, backgroundColor: Colors.background, borderRadius: 12,
+  paddingLeft: 14, paddingRight: 14, fontSize: 15, color: Colors.text,
+  border: `1px solid ${Colors.border}`, width: '100%',
+  boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
+};
 
 export default function TripsScreen() {
   const { user, signOut } = useAuthStore();
@@ -22,10 +40,34 @@ export default function TripsScreen() {
   const [endDate, setEndDate] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('✈️');
   const [creating, setCreating] = useState(false);
+  const [tripEmojis, setTripEmojis] = useState(DEFAULT_TRIP_EMOJIS);
+  const [addingEmoji, setAddingEmoji] = useState(false);
+  const [newEmojiInput, setNewEmojiInput] = useState('');
 
   useEffect(() => {
-    if (user) fetchTrips(user.id);
+    if (user) {
+      fetchTrips(user.id);
+      setTripEmojis(loadUserEmojis(user.id));
+    }
   }, [user]);
+
+  const handleAddEmoji = () => {
+    const e = newEmojiInput.trim();
+    if (e && !tripEmojis.includes(e)) {
+      const next = [...tripEmojis, e];
+      setTripEmojis(next);
+      if (user) saveUserEmojis(user.id, next);
+    }
+    setNewEmojiInput('');
+    setAddingEmoji(false);
+  };
+
+  const handleRemoveEmoji = (e: string) => {
+    const next = tripEmojis.filter((x) => x !== e);
+    setTripEmojis(next);
+    if (user) saveUserEmojis(user.id, next);
+    if (selectedEmoji === e) setSelectedEmoji(next[0] || '✈️');
+  };
 
   const openTrip = (trip: Trip) => {
     setCurrentTrip(trip);
@@ -34,14 +76,11 @@ export default function TripsScreen() {
 
   const handleCreate = async () => {
     if (!name || !startDate || !endDate) return Alert.alert('請填寫旅程名稱和日期');
+    if (endDate < startDate) return Alert.alert('回程日不能早於出發日');
     setCreating(true);
     const trip = await createTrip({
-      name,
-      destination,
-      start_date: startDate,
-      end_date: endDate,
-      cover_emoji: selectedEmoji,
-      owner_id: user!.id,
+      name, destination, start_date: startDate, end_date: endDate,
+      cover_emoji: selectedEmoji, owner_id: user!.id,
     });
     setCreating(false);
     if (trip) {
@@ -53,9 +92,7 @@ export default function TripsScreen() {
 
   const handleDelete = (item: Trip) => {
     if (item.owner_id !== user?.id) return;
-    if (window.confirm(`確定要刪除「${item.name}」？此操作無法復原。`)) {
-      deleteTrip(item.id);
-    }
+    if (window.confirm(`確定要刪除「${item.name}」？此操作無法復原。`)) deleteTrip(item.id);
   };
 
   const renderTrip = ({ item }: { item: Trip }) => {
@@ -72,9 +109,7 @@ export default function TripsScreen() {
           <View style={styles.cardContent}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             {item.destination ? <Text style={styles.cardSub}>📍 {item.destination}</Text> : null}
-            <Text style={styles.cardDate}>
-              {start.format('MM/DD')} - {end.format('MM/DD')} · {days} 天
-            </Text>
+            <Text style={styles.cardDate}>{start.format('MM/DD')} - {end.format('MM/DD')} · {days} 天</Text>
           </View>
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>
@@ -123,20 +158,43 @@ export default function TripsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <ScrollView style={styles.modalBox} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={styles.modalTitle}>建立新旅程</Text>
 
             <Text style={styles.label}>選擇圖示</Text>
             <View style={styles.emojiRow}>
-              {TRIP_EMOJIS.map((e) => (
-                <TouchableOpacity
-                  key={e}
-                  style={[styles.emojiBtn, selectedEmoji === e && styles.emojiBtnSelected]}
-                  onPress={() => setSelectedEmoji(e)}
-                >
-                  <Text style={styles.emojiText}>{e}</Text>
-                </TouchableOpacity>
+              {tripEmojis.map((e) => (
+                <View key={e} style={styles.emojiBtnWrap}>
+                  <TouchableOpacity
+                    style={[styles.emojiBtn, selectedEmoji === e && styles.emojiBtnSelected]}
+                    onPress={() => setSelectedEmoji(e)}
+                  >
+                    <Text style={styles.emojiText}>{e}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.emojiRemove} onPress={() => handleRemoveEmoji(e)}>
+                    <Text style={styles.emojiRemoveText}>×</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
+              {addingEmoji ? (
+                <View style={styles.emojiAddRow}>
+                  <TextInput
+                    style={styles.emojiAddInput}
+                    value={newEmojiInput}
+                    onChangeText={setNewEmojiInput}
+                    placeholder="emoji"
+                    maxLength={4}
+                    autoFocus
+                  />
+                  <TouchableOpacity style={styles.emojiConfirmBtn} onPress={handleAddEmoji}>
+                    <Text style={styles.emojiConfirmText}>✓</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.emojiAddBtn} onPress={() => setAddingEmoji(true)}>
+                  <Text style={styles.emojiAddBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <Text style={styles.label}>旅程名稱 *</Text>
@@ -147,25 +205,23 @@ export default function TripsScreen() {
             <TextInput style={styles.input} value={destination} onChangeText={setDestination}
               placeholder="例：日本岡山・廣島" placeholderTextColor={Colors.textLight} />
 
-            <View style={styles.dateRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>出發日 *</Text>
-                {Platform.OS === 'web' ? (
-                  <input type="date" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} style={webDateStyle} />
-                ) : (
-                  <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />
-                )}
-              </View>
-              <View style={{ width: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>回程日 *</Text>
-                {Platform.OS === 'web' ? (
-                  <input type="date" value={endDate} onChange={(e: any) => setEndDate(e.target.value)} style={webDateStyle} />
-                ) : (
-                  <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="2026-04-27" placeholderTextColor={Colors.textLight} />
-                )}
-              </View>
-            </View>
+            <Text style={styles.label}>出發日 *</Text>
+            {Platform.OS === 'web' ? (
+              <input type="date" value={startDate} min={today}
+                onChange={(e: any) => { setStartDate(e.target.value); if (endDate && endDate < e.target.value) setEndDate(''); }}
+                style={webDateStyle} />
+            ) : (
+              <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />
+            )}
+
+            <Text style={styles.label}>回程日 *</Text>
+            {Platform.OS === 'web' ? (
+              <input type="date" value={endDate} min={startDate || today}
+                onChange={(e: any) => setEndDate(e.target.value)}
+                style={webDateStyle} />
+            ) : (
+              <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="2026-04-27" placeholderTextColor={Colors.textLight} />
+            )}
 
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
@@ -175,48 +231,26 @@ export default function TripsScreen() {
                 {creating ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>建立</Text>}
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const webDateStyle: any = {
-  height: 46, backgroundColor: Colors.background, borderRadius: 12,
-  paddingLeft: 14, paddingRight: 14, fontSize: 15, color: Colors.text,
-  border: `1px solid ${Colors.border}`, width: '100%',
-  boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   greeting: { fontSize: 14, color: Colors.textSecondary },
   headerTitle: { fontSize: 26, fontWeight: '700', color: Colors.text },
   signOutBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.border, borderRadius: 10 },
   signOutText: { color: Colors.textSecondary, fontSize: 13 },
   list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 },
   cardWrap: { marginBottom: 12, position: 'relative' },
-  card: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
-    borderRadius: 16, padding: 16,
-    shadowColor: Colors.shadow, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  deleteBtn: {
-    position: 'absolute', top: 10, right: 10,
-    backgroundColor: '#FEE2E2', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4,
-  },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 16, padding: 16, shadowColor: Colors.shadow, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  deleteBtn: { position: 'absolute', top: 10, right: 10, backgroundColor: '#FEE2E2', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   deleteBtnText: { fontSize: 14 },
-  cardLeft: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.background,
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
-  },
+  cardLeft: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   cardEmoji: { fontSize: 28 },
   cardContent: { flex: 1 },
   cardTitle: { fontSize: 16, fontWeight: '600', color: Colors.text, marginBottom: 2 },
@@ -227,43 +261,29 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 60, marginBottom: 16 },
   emptyText: { fontSize: 18, fontWeight: '600', color: Colors.text },
   emptySubtext: { fontSize: 14, color: Colors.textSecondary, marginTop: 6 },
-  fab: {
-    position: 'absolute', bottom: 32, alignSelf: 'center',
-    backgroundColor: Colors.primary, borderRadius: 30,
-    paddingVertical: 16, paddingHorizontal: 32,
-    shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
+  fab: { position: 'absolute', bottom: 32, alignSelf: 'center', backgroundColor: Colors.primary, borderRadius: 30, paddingVertical: 16, paddingHorizontal: 32, shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: {
-    backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
-  },
+  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '92%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 20, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
-  input: {
-    height: 46, backgroundColor: Colors.background, borderRadius: 12,
-    paddingHorizontal: 14, fontSize: 15, color: Colors.text,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  emojiBtn: {
-    width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.background,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
+  emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  emojiBtnWrap: { position: 'relative' },
+  emojiBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   emojiBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
-  emojiText: { fontSize: 22 },
-  dateRow: { flexDirection: 'row' },
+  emojiText: { fontSize: 24 },
+  emojiRemove: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.danger, justifyContent: 'center', alignItems: 'center' },
+  emojiRemoveText: { color: '#fff', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  emojiAddBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  emojiAddBtnText: { fontSize: 22, color: Colors.textSecondary },
+  emojiAddRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  emojiAddInput: { width: 56, height: 48, backgroundColor: Colors.background, borderRadius: 12, textAlign: 'center', fontSize: 20, color: Colors.text, borderWidth: 1, borderColor: Colors.primary },
+  emojiConfirmBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  emojiConfirmText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', marginTop: 24, gap: 12 },
-  cancelBtn: {
-    flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border,
-  },
+  cancelBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
-  createBtn: {
-    flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: Colors.primary,
-  },
+  createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

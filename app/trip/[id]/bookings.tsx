@@ -254,34 +254,34 @@ export default function BookingsScreen() {
         <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="ABC123" placeholderTextColor={Colors.textLight} autoCapitalize="characters" />
 
         <Text style={styles.label}>出發地</Text>
-        <View style={styles.rowFields}>
-          <TextInput style={[styles.input, { flex: 2 }]} value={form.from_city} onChangeText={(v) => setField('from_city', v)} placeholder="高雄 / KHH" placeholderTextColor={Colors.textLight} />
-          <View style={{ width: 10 }} />
-          <TextInput style={[styles.input, { flex: 1 }]} value={form.from_terminal} onChangeText={(v) => setField('from_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
-        </View>
+        <TextInput style={styles.input} value={form.from_city} onChangeText={(v) => setField('from_city', v)} placeholder="高雄 / KHH" placeholderTextColor={Colors.textLight} />
+        <TextInput style={[styles.input, { marginTop: 6 }]} value={form.from_terminal} onChangeText={(v) => setField('from_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
 
         <Text style={styles.label}>目的地</Text>
-        <View style={styles.rowFields}>
-          <TextInput style={[styles.input, { flex: 2 }]} value={form.to_city} onChangeText={(v) => setField('to_city', v)} placeholder="岡山 / OKJ" placeholderTextColor={Colors.textLight} />
-          <View style={{ width: 10 }} />
-          <TextInput style={[styles.input, { flex: 1 }]} value={form.to_terminal} onChangeText={(v) => setField('to_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
+        <TextInput style={styles.input} value={form.to_city} onChangeText={(v) => setField('to_city', v)} placeholder="岡山 / OKJ" placeholderTextColor={Colors.textLight} />
+        <TextInput style={[styles.input, { marginTop: 6 }]} value={form.to_terminal} onChangeText={(v) => setField('to_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
+
+        <View style={styles.timePairRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>出發時間</Text>
+            <TimeInput
+              hourVal={form.dep_hour} minVal={form.dep_min}
+              onHourChange={(v) => setField('dep_hour', v)}
+              onMinChange={(v) => setField('dep_min', v)}
+              minRef={depMinRef}
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>抵達時間</Text>
+            <TimeInput
+              hourVal={form.arr_hour} minVal={form.arr_min}
+              onHourChange={(v) => setField('arr_hour', v)}
+              onMinChange={(v) => setField('arr_min', v)}
+              minRef={arrMinRef}
+            />
+          </View>
         </View>
-
-        <Text style={styles.label}>出發時間</Text>
-        <TimeInput
-          hourVal={form.dep_hour} minVal={form.dep_min}
-          onHourChange={(v) => setField('dep_hour', v)}
-          onMinChange={(v) => setField('dep_min', v)}
-          minRef={depMinRef}
-        />
-
-        <Text style={styles.label}>抵達時間</Text>
-        <TimeInput
-          hourVal={form.arr_hour} minVal={form.arr_min}
-          onHourChange={(v) => setField('arr_hour', v)}
-          onMinChange={(v) => setField('arr_min', v)}
-          minRef={arrMinRef}
-        />
 
         <Text style={styles.label}>乘客</Text>
         <MemberSelect />
@@ -299,21 +299,15 @@ export default function BookingsScreen() {
         <Text style={styles.label}>訂位代號</Text>
         <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="ABC123" placeholderTextColor={Colors.textLight} />
 
-        <View style={styles.rowFields}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Check-in</Text>
-            {Platform.OS === 'web'
-              ? <input type="date" value={form.check_in} onChange={(e: any) => setField('check_in', e.target.value)} style={webDateStyle} />
-              : <TextInput style={styles.input} value={form.check_in} onChangeText={(v) => setField('check_in', v)} placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />}
-          </View>
-          <View style={{ width: 10 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Check-out</Text>
-            {Platform.OS === 'web'
-              ? <input type="date" value={form.check_out} onChange={(e: any) => setField('check_out', e.target.value)} style={webDateStyle} />
-              : <TextInput style={styles.input} value={form.check_out} onChangeText={(v) => setField('check_out', v)} placeholder="2026-04-21" placeholderTextColor={Colors.textLight} />}
-          </View>
-        </View>
+        <Text style={styles.label}>Check-in</Text>
+        {Platform.OS === 'web'
+          ? <input type="date" value={form.check_in} onChange={(e: any) => setField('check_in', e.target.value)} style={webDateStyle} />
+          : <TextInput style={styles.input} value={form.check_in} onChangeText={(v) => setField('check_in', v)} placeholder="2026-04-20" placeholderTextColor={Colors.textLight} />}
+
+        <Text style={styles.label}>Check-out</Text>
+        {Platform.OS === 'web'
+          ? <input type="date" value={form.check_out} onChange={(e: any) => setField('check_out', e.target.value)} style={webDateStyle} />
+          : <TextInput style={styles.input} value={form.check_out} onChangeText={(v) => setField('check_out', v)} placeholder="2026-04-21" placeholderTextColor={Colors.textLight} />}
 
         <Text style={styles.label}>住客</Text>
         <MemberSelect />
@@ -477,6 +471,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   rowFields: { flexDirection: 'row', alignItems: 'flex-end' },
+  timePairRow: { flexDirection: 'row', alignItems: 'flex-start' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   timeInput: { flex: 1, height: 60, backgroundColor: Colors.background, borderRadius: 14, fontSize: 28, fontWeight: '700', color: Colors.text, borderWidth: 1, borderColor: Colors.border, textAlign: 'center' },
   timeSep: { fontSize: 32, fontWeight: '700', color: Colors.text },

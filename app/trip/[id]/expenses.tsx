@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, ActivityIndicator,
+  SafeAreaView, Modal, TextInput, ActivityIndicator, Platform,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
@@ -9,16 +9,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useAuthStore } from '../../../store/authStore';
-import { EXPENSE_CATEGORIES, CURRENCIES, EXCHANGE_RATES, Expense } from '../../../types';
+import { CURRENCIES, EXCHANGE_RATES, Expense } from '../../../types';
 
-const CATEGORY_EMOJIS: Record<string, string> = {
+const LEGACY_CAT_EMOJI: Record<string, string> = {
   food: '🍽️', transport: '🚗', accommodation: '🏨',
   shopping: '🛍️', activity: '🎡', insurance: '🛡️', other: '📌',
+};
+const catEmoji = (c: string) => LEGACY_CAT_EMOJI[c] || c;
+
+const DEFAULT_EXPENSE_CATS = ['🏨', '🍽️', '🚗'];
+
+function loadExpenseCats(userId: string): string[] {
+  try { const s = localStorage.getItem(`expense_cats_${userId}`); return s ? JSON.parse(s) : DEFAULT_EXPENSE_CATS; }
+  catch { return DEFAULT_EXPENSE_CATS; }
+}
+function saveExpenseCats(userId: string, list: string[]) {
+  localStorage.setItem(`expense_cats_${userId}`, JSON.stringify(list));
+}
+
+const webSelectStyle: any = {
+  height: 46, backgroundColor: Colors.background, borderRadius: 12,
+  paddingLeft: 14, fontSize: 15, color: Colors.text,
+  border: `1px solid ${Colors.border}`, width: '100%',
+  boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
 };
 
 const emptyForm = () => ({
   title: '', amount: '', currency: 'TWD',
-  category: 'food' as keyof typeof EXPENSE_CATEGORIES,
+  category: '🍽️',
   paidBy: '', payMethod: 'card' as 'card' | 'cash',
   date: dayjs().format('YYYY-MM-DD'),
   sharedWith: [] as string[],
@@ -86,10 +104,33 @@ export default function ExpensesScreen() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
+  const [expenseCats, setExpenseCats] = useState(DEFAULT_EXPENSE_CATS);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatInput, setNewCatInput] = useState('');
 
   useEffect(() => {
     if (id) { fetchTripById(id); fetchExpenses(id); fetchMembers(id); }
   }, [id]);
+
+  useEffect(() => {
+    if (user) setExpenseCats(loadExpenseCats(user.id));
+  }, [user]);
+
+  const handleAddCat = () => {
+    const e = newCatInput.trim();
+    if (e && !expenseCats.includes(e)) {
+      const next = [...expenseCats, e];
+      setExpenseCats(next);
+      if (user) saveExpenseCats(user.id, next);
+    }
+    setNewCatInput(''); setAddingCat(false);
+  };
+
+  const handleRemoveCat = (e: string) => {
+    const next = expenseCats.filter((x) => x !== e);
+    setExpenseCats(next);
+    if (user) saveExpenseCats(user.id, next);
+  };
 
   const memberNames = members.map((m) => m.display_name);
 
@@ -296,7 +337,7 @@ export default function ExpensesScreen() {
                     {/* 收合狀態 */}
                     <View style={styles.expenseCollapsed}>
                       <View style={styles.catEmoji}>
-                        <Text style={{ fontSize: 20 }}>{CATEGORY_EMOJIS[e.category] ?? '📌'}</Text>
+                        <Text style={{ fontSize: 20 }}>{catEmoji(e.category)}</Text>
                       </View>
                       <View style={styles.expenseLeft}>
                         <Text style={styles.expenseTitle}>{e.title}</Text>
@@ -320,7 +361,7 @@ export default function ExpensesScreen() {
                         <View style={styles.detailGrid}>
                           <View style={styles.detailItem}>
                             <Text style={styles.detailLabel}>類別</Text>
-                            <Text style={styles.detailValue}>{CATEGORY_EMOJIS[e.category]} {EXPENSE_CATEGORIES[e.category]}</Text>
+                            <Text style={styles.detailValue}>{catEmoji(e.category)}</Text>
                           </View>
                           <View style={styles.detailItem}>
                             <Text style={styles.detailLabel}>付款人</Text>
@@ -408,15 +449,33 @@ export default function ExpensesScreen() {
             <Text style={styles.modalTitle}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
 
             <Text style={styles.label}>類別</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.catRow}>
-                {Object.entries(EXPENSE_CATEGORIES).map(([k, v]) => (
-                  <TouchableOpacity key={k} style={[styles.catBtn, form.category === k && styles.catBtnSelected]} onPress={() => setField('category', k)}>
-                    <Text>{CATEGORY_EMOJIS[k]} {v}</Text>
+            <View style={styles.catRow}>
+              {expenseCats.map((e) => (
+                <View key={e} style={styles.catBtnWrap}>
+                  <TouchableOpacity
+                    style={[styles.catBtn, form.category === e && styles.catBtnSelected]}
+                    onPress={() => setField('category', e)}
+                  >
+                    <Text style={styles.catBtnEmoji}>{e}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+                  <TouchableOpacity style={styles.catRemove} onPress={() => handleRemoveCat(e)}>
+                    <Text style={styles.catRemoveText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {addingCat ? (
+                <View style={styles.catAddRow}>
+                  <TextInput style={styles.catAddInput} value={newCatInput} onChangeText={setNewCatInput} placeholder="emoji" maxLength={4} autoFocus />
+                  <TouchableOpacity style={styles.catConfirmBtn} onPress={handleAddCat}>
+                    <Text style={styles.catConfirmText}>✓</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.catAddBtn} onPress={() => setAddingCat(true)}>
+                  <Text style={styles.catAddBtnText}>+</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <Text style={styles.label}>消費項目 *</Text>
             <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="例：晚餐" placeholderTextColor={Colors.textLight} />
@@ -429,13 +488,13 @@ export default function ExpensesScreen() {
               <View style={{ width: 10 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>幣別</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ height: 46, marginTop: 6 }}>
-                  {CURRENCIES.map((c) => (
-                    <TouchableOpacity key={c} style={[styles.currencyBtn, form.currency === c && styles.currencyBtnSelected]} onPress={() => setField('currency', c)}>
-                      <Text style={[{ fontSize: 12, color: Colors.textSecondary }, form.currency === c && { color: '#fff' }]}>{c}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {Platform.OS === 'web' ? (
+                  <select value={form.currency} onChange={(e: any) => setField('currency', e.target.value)} style={webSelectStyle}>
+                    {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <TextInput style={styles.input} value={form.currency} onChangeText={(v) => setField('currency', v.toUpperCase())} placeholder="TWD" placeholderTextColor={Colors.textLight} autoCapitalize="characters" maxLength={3} />
+                )}
               </View>
             </View>
 
@@ -572,9 +631,19 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  catRow: { flexDirection: 'row', gap: 8 },
-  catBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  catBtnSelected: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
+  catBtnWrap: { position: 'relative' },
+  catBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  catBtnEmoji: { fontSize: 24 },
+  catBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
+  catRemove: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.danger, justifyContent: 'center', alignItems: 'center' },
+  catRemoveText: { color: '#fff', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  catAddBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed' },
+  catAddBtnText: { fontSize: 22, color: Colors.textSecondary },
+  catAddRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  catAddInput: { width: 56, height: 48, backgroundColor: Colors.background, borderRadius: 12, textAlign: 'center', fontSize: 20, color: Colors.text, borderWidth: 1, borderColor: Colors.primary },
+  catConfirmBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  catConfirmText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   amtRow: { flexDirection: 'row', alignItems: 'flex-end' },
   currencyBtn: { paddingHorizontal: 10, height: 46, borderRadius: 10, backgroundColor: Colors.background, marginRight: 6, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center', minWidth: 46 },
   currencyBtnSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },

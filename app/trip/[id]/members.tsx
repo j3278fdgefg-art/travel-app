@@ -42,6 +42,7 @@ export default function MembersScreen() {
   const [avatar, setAvatar] = useState('😀');
   const [customEmoji, setCustomEmoji] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedOnce, setCopiedOnce] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -171,6 +172,16 @@ export default function MembersScreen() {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const generateOneTimeLink = async () => {
+    if (!id) return;
+    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    await supabase.from('trips').update({ single_use_token: token } as any).eq('id', id);
+    const url = `${origin}/join/${id}?ot=${token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedOnce(true);
+    setTimeout(() => setCopiedOnce(false), 3000);
+  };
+
   const actionIcon = (action: string) => {
     if (action.includes('新增')) return '➕';
     if (action.includes('編輯') || action.includes('修改')) return '✏️';
@@ -207,7 +218,14 @@ export default function MembersScreen() {
               <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
             </TouchableOpacity>
           </View>
-          {copied && <Text style={styles.copiedHint}>邀請連結已複製！傳給旅伴後他們點連結即可加入</Text>}
+          {isOwner && (
+            <TouchableOpacity style={[styles.shareBtn, styles.onceBtn]} onPress={generateOneTimeLink}>
+              <Text style={styles.shareIcon}>{copiedOnce ? '✅' : '🎫'}</Text>
+              <Text style={styles.shareBtnText}>{copiedOnce ? '已複製一次性連結' : '一次性連結'}</Text>
+            </TouchableOpacity>
+          )}
+          {copied && <Text style={styles.copiedHint}>邀請連結已複製！（5 分鐘有效）</Text>}
+          {copiedOnce && <Text style={styles.copiedHint}>一次性連結已複製！用過即失效</Text>}
         </View>
 
         {/* 成員清單 */}
@@ -234,11 +252,6 @@ export default function MembersScreen() {
                   <Text style={styles.roleTag}>👑 主辦人</Text>
                   {!!ownerMember.line_id && <Text style={styles.contactTag}>💬 {ownerMember.line_id}</Text>}
                   {!!ownerMember.ig_handle && <Text style={styles.contactTag}>📸 {ownerMember.ig_handle}</Text>}
-                  {canEditOwner && (
-                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(ownerMember)}>
-                      <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
-                    </TouchableOpacity>
-                  )}
                 </TouchableOpacity>
               );
             })()}
@@ -261,11 +274,6 @@ export default function MembersScreen() {
                   {!!m.line_id && <Text style={styles.contactTag}>💬 {m.line_id}</Text>}
                   {!!m.ig_handle && <Text style={styles.contactTag}>📸 {m.ig_handle}</Text>}
                   <View style={styles.memberActions}>
-                    {canEdit && (
-                      <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(m)}>
-                        <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
-                      </TouchableOpacity>
-                    )}
                     {isOwner && (
                       <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
                         <Ionicons name="trash-outline" size={13} color={Colors.danger} />
@@ -377,23 +385,30 @@ export default function MembersScreen() {
                   <Text style={styles.avatarBtnText}>{a}</Text>
                 </TouchableOpacity>
               ))}
-              {/* 自訂 emoji 輸入 */}
-              <View style={styles.customEmojiWrap}>
-                <View style={[styles.avatarBtn, styles.avatarPreview, customEmoji ? styles.avatarBtnSelected : null]}>
-                  <Text style={styles.avatarBtnText}>{customEmoji || '✏️'}</Text>
-                </View>
-                <TextInput
-                  style={styles.customEmojiInput}
-                  value={customEmoji}
-                  onChangeText={(v) => {
-                    setCustomEmoji(v);
-                    if (v.trim()) setAvatar(v.trim());
-                  }}
-                  placeholder="貼上任意 emoji"
-                  placeholderTextColor={Colors.textLight}
-                  maxLength={8}
-                />
-              </View>
+              {customEmoji ? (
+                <TouchableOpacity
+                  style={[styles.avatarBtn, styles.avatarBtnSelected]}
+                  onPress={() => {}}
+                >
+                  <Text style={styles.avatarBtnText}>{customEmoji}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.customEmojiRow}>
+              <TextInput
+                style={styles.customEmojiInput}
+                value={customEmoji}
+                onChangeText={(v) => { setCustomEmoji(v); if (v.trim()) setAvatar(v.trim()); }}
+                placeholder="貼上任意 emoji"
+                placeholderTextColor={Colors.textLight}
+                maxLength={8}
+              />
+              <TouchableOpacity
+                style={styles.customEmojiConfirm}
+                onPress={() => { if (customEmoji.trim()) setAvatar(customEmoji.trim()); }}
+              >
+                <Text style={styles.customEmojiConfirmText}>+</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.modalBtns}>
@@ -461,13 +476,15 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
+  onceBtn: { marginTop: 8, alignSelf: 'center' },
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   avatarBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  avatarPreview: {},
   avatarBtnSelected: { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary },
   avatarBtnText: { fontSize: 26 },
-  customEmojiWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  customEmojiRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   customEmojiInput: { flex: 1, height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 12, fontSize: 18, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
+  customEmojiConfirm: { width: 46, height: 46, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  customEmojiConfirmText: { color: '#fff', fontSize: 22, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', marginTop: 24, gap: 12 },
   cancelBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
