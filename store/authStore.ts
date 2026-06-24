@@ -26,12 +26,26 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   signUp: async (email, password, name) => {
-    const { error } = await supabase.auth.signUp({
+    // 檢查名稱是否已被使用
+    const { data: existing } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('display_name', name)
+      .maybeSingle();
+    if (existing) return '此名稱已被其他帳號使用，請換一個名字';
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { display_name: name } },
     });
-    return error?.message ?? null;
+    if (error) return error.message;
+
+    // 建立名稱唯一紀錄
+    if (data.user) {
+      await supabase.from('user_profiles').insert({ id: data.user.id, display_name: name });
+    }
+    return null;
   },
 
   signOut: async () => {

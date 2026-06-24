@@ -48,19 +48,34 @@ export default function JoinTripScreen() {
     if (!user || !trip) return;
     setJoining(true);
     const displayName =
-      (user as any).user_metadata?.full_name ||
       (user as any).user_metadata?.display_name ||
+      (user as any).user_metadata?.full_name ||
       user.email?.split('@')[0] ||
       '旅伴';
 
-    const { error } = await supabase.from('trip_members').insert({
-      trip_id: id,
-      user_id: user.id,
-      display_name: displayName,
-      avatar_emoji: '😀',
-      role: 'member',
-      email: user.email,
-    });
+    // 若行程裡已有同名但未連結帳號的成員，直接合併（不新增）
+    const { data: unlinked } = await supabase
+      .from('trip_members')
+      .select('id, user_id')
+      .eq('trip_id', id)
+      .eq('display_name', displayName)
+      .is('user_id', null)
+      .maybeSingle();
+
+    let error: any = null;
+    if (unlinked) {
+      const res = await supabase
+        .from('trip_members')
+        .update({ user_id: user.id, email: user.email })
+        .eq('id', unlinked.id);
+      error = res.error;
+    } else {
+      const res = await supabase.from('trip_members').insert({
+        trip_id: id, user_id: user.id, display_name: displayName,
+        avatar_emoji: '😀', role: 'member', email: user.email,
+      });
+      error = res.error;
+    }
 
     setJoining(false);
     if (error) {
