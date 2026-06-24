@@ -5,11 +5,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
 export default function JoinTripScreen() {
-  const { id, ot } = useGlobalSearchParams<{ id: string; ot?: string }>();
+  const { id, ot, pt } = useGlobalSearchParams<{ id: string; ot?: string; pt?: string }>();
   const { user, loading: authLoading } = useAuthStore();
   const router = useRouter();
   const [trip, setTrip] = useState<any>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'already' | 'error' | 'error_once'>('loading');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'already' | 'error'>('loading');
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
@@ -23,12 +23,19 @@ export default function JoinTripScreen() {
     const { data: tripData } = await supabase.from('trips').select('*').eq('id', id).single();
     if (!tripData) { setStatus('error'); return; }
 
-    // 一次性連結驗證（5 分鐘有效）
-    if (!ot || !tripData.single_use_token || tripData.single_use_token !== ot) {
-      setStatus('error'); return;
-    }
-    if (tripData.invite_expires_at && new Date(tripData.invite_expires_at) < new Date()) {
-      setStatus('error'); return;
+    if (pt) {
+      // 永久連結驗證
+      if (!(tripData as any).permanent_invite_token || (tripData as any).permanent_invite_token !== pt) {
+        setStatus('error'); return;
+      }
+    } else {
+      // 一次性連結驗證（5 分鐘有效）
+      if (!ot || !tripData.single_use_token || tripData.single_use_token !== ot) {
+        setStatus('error'); return;
+      }
+      if (tripData.invite_expires_at && new Date(tripData.invite_expires_at) < new Date()) {
+        setStatus('error'); return;
+      }
     }
 
     setTrip(tripData);
@@ -78,7 +85,7 @@ export default function JoinTripScreen() {
       error = res.error;
     }
 
-    if (!error) {
+    if (!error && !pt) {
       await supabase.from('trips').update({ single_use_token: null, invite_expires_at: null } as any).eq('id', id);
     }
 

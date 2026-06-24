@@ -11,3 +11,4 @@ alter table trip_members add column if not exists ig_handle text;
 -- 新增 trips 的邀請連結欄位
 alter table trips add column if not exists single_use_token text;
 alter table trips add column if not exists invite_expires_at timestamptz;
+alter table trips add column if not exists permanent_invite_token text;

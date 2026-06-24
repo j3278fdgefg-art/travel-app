@@ -34,6 +34,7 @@ export default function MembersScreen() {
   const [avatar, setAvatar] = useState('😀');
   const [customEmoji, setCustomEmoji] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedPerm, setCopiedPerm] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -160,6 +161,32 @@ export default function MembersScreen() {
     return `${origin}/join/${id}?ot=${token}`;
   };
 
+  const getPermanentLink = async () => {
+    if (!id) return null;
+    const { data: tripData } = await supabase.from('trips').select('permanent_invite_token').eq('id', id).single();
+    let token = (tripData as any)?.permanent_invite_token;
+    if (!token) {
+      token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      await supabase.from('trips').update({ permanent_invite_token: token } as any).eq('id', id);
+    }
+    return `${origin}/join/${id}?pt=${token}`;
+  };
+
+  const shareLinePerm = async () => {
+    const url = await getPermanentLink();
+    if (!url) return;
+    const msg = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${url}`;
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const copyPermLink = async () => {
+    const url = await getPermanentLink();
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    setCopiedPerm(true);
+    setTimeout(() => setCopiedPerm(false), 2500);
+  };
+
   const shareLine = async () => {
     const url = await generateLink();
     if (!url) return;
@@ -202,18 +229,33 @@ export default function MembersScreen() {
 
           {/* 分享按鈕列（僅主辦人） */}
           {isOwner && (
-            <View style={styles.shareRow}>
-              <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
-                <Text style={styles.shareIcon}>💬</Text>
-                <Text style={styles.shareBtnText}>LINE 分享</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
-                <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
-                <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
-              </TouchableOpacity>
-            </View>
+            <>
+              <Text style={styles.shareSectionLabel}>一次性邀請（5 分鐘，用後失效）</Text>
+              <View style={styles.shareRow}>
+                <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
+                  <Text style={styles.shareIcon}>💬</Text>
+                  <Text style={styles.shareBtnText}>LINE 分享</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
+                  <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
+                  <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
+                </TouchableOpacity>
+              </View>
+              {copied && <Text style={styles.copiedHint}>已複製！（5 分鐘有效，使用後失效）</Text>}
+              <Text style={[styles.shareSectionLabel, { marginTop: 10 }]}>永久邀請（可重複使用）</Text>
+              <View style={styles.shareRow}>
+                <TouchableOpacity style={styles.shareBtn} onPress={shareLinePerm}>
+                  <Text style={styles.shareIcon}>💬</Text>
+                  <Text style={styles.shareBtnText}>LINE 分享</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareBtn} onPress={copyPermLink}>
+                  <Text style={styles.shareIcon}>{copiedPerm ? '✅' : '♾️'}</Text>
+                  <Text style={styles.shareBtnText}>{copiedPerm ? '已複製' : '複製永久連結'}</Text>
+                </TouchableOpacity>
+              </View>
+              {copiedPerm && <Text style={styles.copiedHint}>永久連結已複製！（可重複使用）</Text>}
+            </>
           )}
-          {copied && <Text style={styles.copiedHint}>邀請連結已複製！（5 分鐘有效，使用後失效）</Text>}
         </View>
 
         {/* 成員清單 */}
@@ -430,6 +472,7 @@ const styles = StyleSheet.create({
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
   syncDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accentLight },
   syncText: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  shareSectionLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 6, marginTop: 4 },
   shareRow: { flexDirection: 'row', gap: 8 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   shareIcon: { fontSize: 15 },
