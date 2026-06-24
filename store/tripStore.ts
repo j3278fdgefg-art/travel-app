@@ -39,6 +39,8 @@ interface TripStore {
   toggleChecklistItem: (id: string, done: boolean) => Promise<void>;
   addItineraryItem: (item: Partial<ItineraryItem>) => Promise<void>;
   addBooking: (booking: Partial<Booking>) => Promise<void>;
+  updateBooking: (id: string, data: Partial<Booking>) => Promise<void>;
+  deleteBooking: (id: string) => Promise<void>;
   addMember: (member: Partial<TripMember>) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
   updateMemberPermission: (id: string, canEdit: boolean) => Promise<void>;
@@ -229,6 +231,17 @@ export const useTripStore = create<TripStore>((set, get) => ({
     const { data, error } = await supabase.from('bookings').insert(booking).select().single();
     if (error) console.error('addBooking error:', error);
     if (data) set((s) => ({ bookings: [...s.bookings, data] }));
+  },
+
+  updateBooking: async (id, data) => {
+    const { error } = await supabase.from('bookings').update(data).eq('id', id);
+    if (error) console.error('updateBooking error:', error);
+    else set((s) => ({ bookings: s.bookings.map((b) => (b.id === id ? { ...b, ...data } : b)) }));
+  },
+
+  deleteBooking: async (id) => {
+    await supabase.from('bookings').delete().eq('id', id);
+    set((s) => ({ bookings: s.bookings.filter((b) => b.id !== id) }));
   },
 
   addMember: async (member) => {

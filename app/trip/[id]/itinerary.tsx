@@ -61,7 +61,7 @@ function getClothing(max: number, min: number): string {
 async function geocode(name: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const res = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh`
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=3`
     );
     const data = await res.json();
     if (data.results?.length) return data.results[0];
@@ -161,6 +161,7 @@ export default function ItineraryScreen() {
   const [urlDetected, setUrlDetected] = useState(false);
   const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherFailed, setWeatherFailed] = useState(false);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -176,10 +177,12 @@ export default function ItineraryScreen() {
     const dest = currentTrip?.destination || currentTrip?.name;
     if (!dest) return;
     setWeatherLoading(true);
+    setWeatherFailed(false);
     fetchWeather(dest).then((list) => {
       const map: Record<string, DayWeather> = {};
       list.forEach((d) => { map[d.date] = d; });
       setWeatherMap(map);
+      setWeatherFailed(list.length === 0);
       setWeatherLoading(false);
     });
   }, [currentTrip?.destination, currentTrip?.name]);
@@ -302,15 +305,18 @@ export default function ItineraryScreen() {
         const dayNum = days[selectedDay].day_number;
         const dateStr = dayjs(days[selectedDay].date).format('M/DD');
         if (!w) {
+          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '無法取得天氣' : '超出預報範圍';
           return (
             <View style={styles.weatherCard}>
               <View style={styles.weatherCardTop}>
-                <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : '📅'}</Text>
+                <View style={styles.weatherIconBox}>
+                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '❌' : '📅'}</Text>
+                </View>
                 <View style={styles.weatherCardCenter}>
                   <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
                   <Text style={styles.weatherDate}>{dateStr}</Text>
                 </View>
-                <Text style={styles.weatherCondition}>{weatherLoading ? '載入中…' : '超出預報範圍'}</Text>
+                <Text style={styles.weatherCondition}>{noDataLabel}</Text>
               </View>
             </View>
           );
@@ -320,7 +326,9 @@ export default function ItineraryScreen() {
         return (
           <View style={styles.weatherCard}>
             <View style={styles.weatherCardTop}>
-              <Text style={styles.weatherEmoji}>{emoji}</Text>
+              <View style={styles.weatherIconBox}>
+                <Text style={styles.weatherEmoji}>{emoji}</Text>
+              </View>
               <View style={styles.weatherCardCenter}>
                 <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
                 <Text style={styles.weatherDate}>{dateStr}</Text>
@@ -535,7 +543,8 @@ const styles = StyleSheet.create({
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   weatherCard: { backgroundColor: Colors.card, marginHorizontal: 12, marginTop: 8, marginBottom: 4, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   weatherCardTop: { flexDirection: 'row', alignItems: 'center' },
-  weatherEmoji: { fontSize: 34, marginRight: 10 },
+  weatherIconBox: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginRight: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  weatherEmoji: { fontSize: 28 },
   weatherCardCenter: { flex: 1, minWidth: 0 },
   weatherDayTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
   weatherDate: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },

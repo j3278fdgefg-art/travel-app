@@ -12,3 +12,8 @@ alter table trip_members add column if not exists ig_handle text;
 alter table trips add column if not exists single_use_token text;
 alter table trips add column if not exists invite_expires_at timestamptz;
 alter table trips add column if not exists permanent_invite_token text;
+
+-- 預訂：追蹤新增者與可見成員
+alter table bookings add column if not exists created_by_user_id uuid;
+alter table bookings add column if not exists created_by_name text;
+alter table bookings add column if not exists visible_to_members text;

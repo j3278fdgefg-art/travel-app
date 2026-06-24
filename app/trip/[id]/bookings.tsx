@@ -7,6 +7,7 @@ import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { useAuthStore } from '../../../store/authStore';
 import { Booking, BOOKING_TYPES } from '../../../types';
 
 const TABS: Array<{ key: Booking['type']; label: string; emoji: string }> = [
@@ -24,116 +25,30 @@ const webDateStyle: any = {
 };
 
 const emptyForm = () => ({
-  // 機票
   airline: '', flight_number: '',
   from_city: '', from_terminal: '',
   to_city: '', to_terminal: '',
   dep_hour: '', dep_min: '',
   arr_hour: '', arr_min: '',
   seat_number: '',
-  // 住宿
   check_in: '', check_out: '',
-  // 租車
   pickup: '', dropoff: '',
-  // 共用
   title: '', booking_ref: '',
   amount: '', currency: 'TWD',
   note: '',
 });
 
-export default function BookingsScreen() {
-  const { height: winHeight } = useWindowDimensions();
-  const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking } = useTripStore();
-  const id = params.id || currentTrip?.id || '';
-  const [activeTab, setActiveTab] = useState<Booking['type']>('flight');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [form, setForm] = useState(emptyForm());
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
-
-  const depMinRef = useRef<any>(null);
-  const arrMinRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (id) { fetchTripById(id); fetchBookings(id); fetchMembers(id); }
-  }, [id]);
-
-  const filtered = bookings.filter((b) => b.type === activeTab);
-  const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  const toggleMember = (name: string) => {
-    setSelectedMembers((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
-  };
-
-  const openModal = () => {
-    setForm(emptyForm());
-    setSelectedMembers(new Set());
-    setModalVisible(true);
-  };
-
-  const handleAdd = async () => {
-    const memberStr = [...selectedMembers].join('、');
-    let payload: Partial<Booking> = {
-      trip_id: id, type: activeTab,
-      booking_ref: form.booking_ref,
-      amount: parseFloat(form.amount) || 0,
-      currency: form.currency,
-      member_names: memberStr,
-      note: form.note,
-    } as any;
-
-    if (activeTab === 'flight') {
-      const title = [form.airline, form.flight_number].filter(Boolean).join(' ');
-      if (!title) { alert('請填寫航空公司或航班號'); return; }
-      payload = {
-        ...payload,
-        title,
-        provider: form.airline,
-        from_location: [form.from_city, form.from_terminal].filter(Boolean).join(' '),
-        to_location: [form.to_city, form.to_terminal].filter(Boolean).join(' '),
-        departure_time: form.dep_hour ? `${form.dep_hour.padStart(2, '0')}:${form.dep_min.padStart(2, '0')}` : '',
-        arrival_time: form.arr_hour ? `${form.arr_hour.padStart(2, '0')}:${form.arr_min.padStart(2, '0')}` : '',
-        note: [form.seat_number ? `座位：${form.seat_number}` : '', form.note].filter(Boolean).join(' | '),
-      };
-    } else if (activeTab === 'hotel') {
-      if (!form.title) { alert('請填寫飯店名稱'); return; }
-      if (currentTrip?.start_date && currentTrip?.end_date) {
-        if (form.check_in && (form.check_in < currentTrip.start_date || form.check_in > currentTrip.end_date)) {
-          alert(`Check-in 日期不在行程時間內\n行程：${currentTrip.start_date} ～ ${currentTrip.end_date}`); return;
-        }
-        if (form.check_out && (form.check_out < currentTrip.start_date || form.check_out > currentTrip.end_date)) {
-          alert(`Check-out 日期不在行程時間內\n行程：${currentTrip.start_date} ～ ${currentTrip.end_date}`); return;
-        }
-      }
-      payload = { ...payload, title: form.title, check_in: form.check_in, check_out: form.check_out };
-    } else if (activeTab === 'car') {
-      if (!form.title) { alert('請填寫租車資訊'); return; }
-      payload = {
-        ...payload, title: form.title,
-        from_location: form.pickup, to_location: form.dropoff,
-      };
-    } else {
-      if (!form.title) { alert('請填寫憑證名稱'); return; }
-      payload = { ...payload, title: form.title };
-    }
-
-    await addBooking(payload);
-    setModalVisible(false);
-  };
-
-  // ── 分拆時間輸入 ──────────────────────────
-  const TimeInput = ({
-    hourVal, minVal, onHourChange, onMinChange, minRef,
-  }: {
-    hourVal: string; minVal: string;
-    onHourChange: (v: string) => void;
-    onMinChange: (v: string) => void;
-    minRef?: any;
-  }) => (
+// Defined OUTSIDE BookingsScreen so React doesn't remount on every render (fixes focus loss)
+function TimeInput({
+  hourVal, minVal, onHourChange, onMinChange, minRef, nextRef,
+}: {
+  hourVal: string; minVal: string;
+  onHourChange: (v: string) => void;
+  onMinChange: (v: string) => void;
+  minRef?: React.RefObject<any>;
+  nextRef?: React.RefObject<any>;
+}) {
+  return (
     <View style={styles.timeRow}>
       <TextInput
         style={styles.timeInput}
@@ -146,6 +61,8 @@ export default function BookingsScreen() {
         }}
         placeholder="09" placeholderTextColor={Colors.textLight}
         keyboardType="numeric" maxLength={2} textAlign="center"
+        returnKeyType="next"
+        onSubmitEditing={() => minRef?.current?.focus()}
       />
       <Text style={styles.timeSep}>:</Text>
       <TextInput
@@ -156,111 +73,301 @@ export default function BookingsScreen() {
           const n = v.replace(/\D/g, '').slice(0, 2);
           if (n !== '' && Number(n) > 59) return;
           onMinChange(n);
+          if (n.length === 2) nextRef?.current?.focus();
         }}
         placeholder="00" placeholderTextColor={Colors.textLight}
         keyboardType="numeric" maxLength={2} textAlign="center"
+        returnKeyType="next"
+        onSubmitEditing={() => nextRef?.current?.focus()}
       />
     </View>
   );
+}
 
-  // ── 成員多選 ──────────────────────────────
-  const MemberSelect = () => (
-    <View style={styles.memberGrid}>
-      {members.map((m) => (
-        <TouchableOpacity
-          key={m.id}
-          style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
-          onPress={() => toggleMember(m.display_name)}
-        >
-          <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
-          <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>
-            {m.display_name}
-          </Text>
-          {selectedMembers.has(m.display_name) && (
-            <Ionicons name="checkmark-circle" size={14} color="#fff" />
-          )}
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+export default function BookingsScreen() {
+  const { height: winHeight } = useWindowDimensions();
+  const params = useGlobalSearchParams<{ id: string }>();
+  const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking, updateBooking, deleteBooking } = useTripStore();
+  const { user } = useAuthStore();
+  const id = params.id || currentTrip?.id || '';
+  const [activeTab, setActiveTab] = useState<Booking['type']>('flight');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [form, setForm] = useState(emptyForm());
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [visibleTo, setVisibleTo] = useState<Set<string>>(new Set());
 
-  // ── 卡片 ──────────────────────────────────
-  const renderBooking = (b: Booking) => (
-    <View key={b.id} style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardEmoji}>{TABS.find((t) => t.key === b.type)?.emoji}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{b.title}</Text>
-          {b.member_names ? <Text style={styles.cardMembers}>👥 {b.member_names}</Text> : null}
-        </View>
-        {b.booking_ref ? (
-          <View style={styles.refBadge}>
-            <Text style={styles.refText}>{b.booking_ref}</Text>
+  // refs for Enter key chaining
+  const flightNumRef = useRef<any>(null);
+  const bookingRefRef = useRef<any>(null);
+  const fromCityRef = useRef<any>(null);
+  const fromTermRef = useRef<any>(null);
+  const toCityRef = useRef<any>(null);
+  const toTermRef = useRef<any>(null);
+  const depMinRef = useRef<any>(null);
+  const arrHourRef = useRef<any>(null);
+  const arrMinRef = useRef<any>(null);
+  const seatRef = useRef<any>(null);
+  const amountRef = useRef<any>(null);
+  const noteRef = useRef<any>(null);
+
+  const myMemberName = members.find((m) => m.user_id === user?.id)?.display_name || '';
+
+  useEffect(() => {
+    if (id) { fetchTripById(id); fetchBookings(id); fetchMembers(id); }
+  }, [id]);
+
+  const filtered = bookings.filter((b) => {
+    if (b.type !== activeTab) return false;
+    if (!b.visible_to_members) return true;
+    if (b.created_by_user_id === user?.id) return true;
+    if (!myMemberName) return true;
+    return b.visible_to_members.split('、').includes(myMemberName);
+  });
+
+  const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const toggleMember = (name: string) => {
+    setSelectedMembers((prev) => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
+  };
+
+  const toggleVisibleTo = (name: string) => {
+    setVisibleTo((prev) => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
+  };
+
+  const openModal = () => {
+    setEditingBooking(null);
+    setForm(emptyForm());
+    setSelectedMembers(new Set());
+    setVisibleTo(new Set());
+    setModalVisible(true);
+  };
+
+  const openEdit = (b: Booking) => {
+    setEditingBooking(b);
+    const [depH = '', depM = ''] = (b.departure_time || '').split(':');
+    const [arrH = '', arrM = ''] = (b.arrival_time || '').split(':');
+    const flightNum = b.provider ? b.title.replace(b.provider, '').trim() : b.title;
+    setForm({
+      airline: b.provider || '',
+      flight_number: b.type === 'flight' ? flightNum : '',
+      from_city: b.from_location || '',
+      from_terminal: '',
+      to_city: b.to_location || '',
+      to_terminal: '',
+      dep_hour: depH, dep_min: depM,
+      arr_hour: arrH, arr_min: arrM,
+      seat_number: '',
+      check_in: b.check_in || '',
+      check_out: b.check_out || '',
+      pickup: b.type === 'car' ? (b.from_location || '') : '',
+      dropoff: b.type === 'car' ? (b.to_location || '') : '',
+      title: b.title || '',
+      booking_ref: b.booking_ref || '',
+      amount: b.amount ? String(b.amount) : '',
+      currency: b.currency || 'TWD',
+      note: b.note || '',
+    });
+    setSelectedMembers(new Set(b.member_names ? b.member_names.split('、') : []));
+    setVisibleTo(new Set(b.visible_to_members ? b.visible_to_members.split('、') : []));
+    setModalVisible(true);
+  };
+
+  const buildPayload = (): Partial<Booking> => {
+    const memberStr = [...selectedMembers].join('、');
+    const visibleStr = [...visibleTo].join('、');
+    let payload: Partial<Booking> = {
+      trip_id: id, type: activeTab,
+      booking_ref: form.booking_ref,
+      amount: parseFloat(form.amount) || 0,
+      currency: form.currency,
+      member_names: memberStr,
+      note: form.note,
+      visible_to_members: visibleStr,
+    } as any;
+
+    if (activeTab === 'flight') {
+      const title = [form.airline, form.flight_number].filter(Boolean).join(' ');
+      payload = {
+        ...payload, title,
+        provider: form.airline,
+        from_location: [form.from_city, form.from_terminal].filter(Boolean).join(' '),
+        to_location: [form.to_city, form.to_terminal].filter(Boolean).join(' '),
+        departure_time: form.dep_hour ? `${form.dep_hour.padStart(2, '0')}:${form.dep_min.padStart(2, '0')}` : '',
+        arrival_time: form.arr_hour ? `${form.arr_hour.padStart(2, '0')}:${form.arr_min.padStart(2, '0')}` : '',
+        note: [form.seat_number ? `座位：${form.seat_number}` : '', form.note].filter(Boolean).join(' | '),
+      };
+    } else if (activeTab === 'hotel') {
+      payload = { ...payload, title: form.title, check_in: form.check_in, check_out: form.check_out };
+    } else if (activeTab === 'car') {
+      payload = { ...payload, title: form.title, from_location: form.pickup, to_location: form.dropoff };
+    } else {
+      payload = { ...payload, title: form.title };
+    }
+    return payload;
+  };
+
+  const handleSave = async () => {
+    if (activeTab === 'flight' && ![form.airline, form.flight_number].some(Boolean)) {
+      alert('請填寫航空公司或航班號'); return;
+    }
+    if (activeTab !== 'flight' && !form.title) {
+      alert('請填寫名稱'); return;
+    }
+    const payload = buildPayload();
+
+    if (editingBooking) {
+      await updateBooking(editingBooking.id, payload);
+    } else {
+      await addBooking({
+        ...payload,
+        created_by_user_id: user?.id || '',
+        created_by_name: myMemberName || user?.email || '',
+      } as any);
+    }
+    setModalVisible(false);
+  };
+
+  const handleDelete = (b: Booking) => {
+    if (window.confirm(`確定刪除「${b.title}」？`)) deleteBooking(b.id);
+  };
+
+  const renderBooking = (b: Booking) => {
+    const isMyBooking = b.created_by_user_id === user?.id;
+    return (
+      <View key={b.id} style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardEmoji}>{TABS.find((t) => t.key === b.type)?.emoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>{b.title}</Text>
+            {b.member_names ? <Text style={styles.cardMembers}>👥 {b.member_names}</Text> : null}
           </View>
-        ) : null}
+          {b.booking_ref ? (
+            <View style={styles.refBadge}>
+              <Text style={styles.refText}>{b.booking_ref}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {(b.from_location || b.to_location) && (
+          <View style={styles.routeRow}>
+            <Text style={styles.airportCode}>{b.from_location || '—'}</Text>
+            <Ionicons name="airplane" size={18} color={Colors.primary} style={{ marginHorizontal: 10 }} />
+            <Text style={styles.airportCode}>{b.to_location || '—'}</Text>
+          </View>
+        )}
+
+        {(b.departure_time || b.arrival_time) && (
+          <View style={styles.flightTimeRow}>
+            <View>
+              <Text style={styles.timeLabel}>出發</Text>
+              <Text style={styles.timeValue}>{b.departure_time}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.timeLabel}>抵達</Text>
+              <Text style={[styles.timeValue, { color: Colors.danger }]}>{b.arrival_time}</Text>
+            </View>
+          </View>
+        )}
+
+        {(b.check_in || b.check_out) && (
+          <View style={styles.flightTimeRow}>
+            <View><Text style={styles.timeLabel}>Check-in</Text><Text style={styles.timeValue}>{b.check_in}</Text></View>
+            <View style={{ alignItems: 'flex-end' }}><Text style={styles.timeLabel}>Check-out</Text><Text style={styles.timeValue}>{b.check_out}</Text></View>
+          </View>
+        )}
+
+        <View style={styles.cardFooter}>
+          {b.note ? <Text style={styles.footerNote}>{b.note}</Text> : null}
+          {b.amount > 0 ? <Text style={styles.footerAmount}>{b.currency} {b.amount.toLocaleString()}</Text> : null}
+        </View>
+
+        {isMyBooking && (
+          <View style={styles.cardActions}>
+            {!!b.visible_to_members && (
+              <Text style={styles.visibleTag}>🔒 限定可見</Text>
+            )}
+            <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(b)}>
+              <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
+              <Text style={styles.editBtnText}>編輯</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(b)}>
+              <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+              <Text style={styles.deleteBtnText}>刪除</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
+    );
+  };
 
-      {(b.from_location || b.to_location) && (
-        <View style={styles.routeRow}>
-          <Text style={styles.airportCode}>{b.from_location || '—'}</Text>
-          <Ionicons name="airplane" size={18} color={Colors.primary} style={{ marginHorizontal: 10 }} />
-          <Text style={styles.airportCode}>{b.to_location || '—'}</Text>
-        </View>
-      )}
-
-      {(b.departure_time || b.arrival_time) && (
-        <View style={styles.flightTimeRow}>
-          <View>
-            <Text style={styles.timeLabel}>出發</Text>
-            <Text style={styles.timeValue}>{b.departure_time}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.timeLabel}>抵達</Text>
-            <Text style={[styles.timeValue, { color: Colors.danger }]}>{b.arrival_time}</Text>
-          </View>
-        </View>
-      )}
-
-      {(b.check_in || b.check_out) && (
-        <View style={styles.flightTimeRow}>
-          <View><Text style={styles.timeLabel}>Check-in</Text><Text style={styles.timeValue}>{b.check_in}</Text></View>
-          <View style={{ alignItems: 'flex-end' }}><Text style={styles.timeLabel}>Check-out</Text><Text style={styles.timeValue}>{b.check_out}</Text></View>
-        </View>
-      )}
-
-      <View style={styles.cardFooter}>
-        {b.note ? <Text style={styles.footerNote}>{b.note}</Text> : null}
-        {b.amount > 0 ? <Text style={styles.footerAmount}>{b.currency} {b.amount.toLocaleString()}</Text> : null}
-      </View>
-    </View>
-  );
-
-  // ── Modal 表單 ────────────────────────────
   const renderForm = () => {
     if (activeTab === 'flight') return (
       <>
         <View style={styles.rowFields}>
           <View style={{ flex: 3 }}>
             <Text style={styles.label}>航空公司</Text>
-            <TextInput style={styles.input} value={form.airline} onChangeText={(v) => setField('airline', v)} placeholder="台灣虎航" placeholderTextColor={Colors.textLight} />
+            <TextInput
+              style={styles.input} value={form.airline}
+              onChangeText={(v) => setField('airline', v)}
+              placeholder="台灣虎航" placeholderTextColor={Colors.textLight}
+              returnKeyType="next" onSubmitEditing={() => flightNumRef.current?.focus()}
+            />
           </View>
           <View style={{ width: 10 }} />
           <View style={{ flex: 2 }}>
             <Text style={styles.label}>航班號</Text>
-            <TextInput style={styles.input} value={form.flight_number} onChangeText={(v) => setField('flight_number', v)} placeholder="IT262" placeholderTextColor={Colors.textLight} autoCapitalize="characters" />
+            <TextInput
+              ref={flightNumRef}
+              style={styles.input} value={form.flight_number}
+              onChangeText={(v) => setField('flight_number', v)}
+              placeholder="IT262" placeholderTextColor={Colors.textLight}
+              autoCapitalize="characters"
+              returnKeyType="next" onSubmitEditing={() => bookingRefRef.current?.focus()}
+            />
           </View>
         </View>
 
         <Text style={styles.label}>訂位代號</Text>
-        <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="ABC123" placeholderTextColor={Colors.textLight} autoCapitalize="characters" />
+        <TextInput
+          ref={bookingRefRef}
+          style={styles.input} value={form.booking_ref}
+          onChangeText={(v) => setField('booking_ref', v)}
+          placeholder="ABC123" placeholderTextColor={Colors.textLight}
+          autoCapitalize="characters"
+          returnKeyType="next" onSubmitEditing={() => fromCityRef.current?.focus()}
+        />
 
         <Text style={styles.label}>出發地</Text>
-        <TextInput style={styles.input} value={form.from_city} onChangeText={(v) => setField('from_city', v)} placeholder="高雄 / KHH" placeholderTextColor={Colors.textLight} />
-        <TextInput style={[styles.input, { marginTop: 6 }]} value={form.from_terminal} onChangeText={(v) => setField('from_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={fromCityRef}
+          style={styles.input} value={form.from_city}
+          onChangeText={(v) => setField('from_city', v)}
+          placeholder="高雄 / KHH" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => fromTermRef.current?.focus()}
+        />
+        <TextInput
+          ref={fromTermRef}
+          style={[styles.input, { marginTop: 6 }]} value={form.from_terminal}
+          onChangeText={(v) => setField('from_terminal', v)}
+          placeholder="航站" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => toCityRef.current?.focus()}
+        />
 
         <Text style={styles.label}>目的地</Text>
-        <TextInput style={styles.input} value={form.to_city} onChangeText={(v) => setField('to_city', v)} placeholder="岡山 / OKJ" placeholderTextColor={Colors.textLight} />
-        <TextInput style={[styles.input, { marginTop: 6 }]} value={form.to_terminal} onChangeText={(v) => setField('to_terminal', v)} placeholder="航站" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={toCityRef}
+          style={styles.input} value={form.to_city}
+          onChangeText={(v) => setField('to_city', v)}
+          placeholder="岡山 / OKJ" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => toTermRef.current?.focus()}
+        />
+        <TextInput
+          ref={toTermRef}
+          style={[styles.input, { marginTop: 6 }]} value={form.to_terminal}
+          onChangeText={(v) => setField('to_terminal', v)}
+          placeholder="航站" placeholderTextColor={Colors.textLight}
+        />
 
         <View style={styles.timePairRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -269,7 +376,7 @@ export default function BookingsScreen() {
               hourVal={form.dep_hour} minVal={form.dep_min}
               onHourChange={(v) => setField('dep_hour', v)}
               onMinChange={(v) => setField('dep_min', v)}
-              minRef={depMinRef}
+              minRef={depMinRef} nextRef={arrHourRef}
             />
           </View>
           <View style={{ width: 12 }} />
@@ -279,26 +386,54 @@ export default function BookingsScreen() {
               hourVal={form.arr_hour} minVal={form.arr_min}
               onHourChange={(v) => setField('arr_hour', v)}
               onMinChange={(v) => setField('arr_min', v)}
-              minRef={arrMinRef}
+              minRef={arrMinRef} nextRef={seatRef}
             />
           </View>
         </View>
 
         <Text style={styles.label}>乘客</Text>
-        <MemberSelect />
+        <View style={styles.memberGrid}>
+          {members.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
+              onPress={() => toggleMember(m.display_name)}
+            >
+              <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+              <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+              {selectedMembers.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Text style={styles.label}>座位</Text>
-        <TextInput style={styles.input} value={form.seat_number} onChangeText={(v) => setField('seat_number', v)} placeholder="21A / 22B" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={seatRef}
+          style={styles.input} value={form.seat_number}
+          onChangeText={(v) => setField('seat_number', v)}
+          placeholder="21A / 22B" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => amountRef.current?.focus()}
+        />
       </>
     );
 
     if (activeTab === 'hotel') return (
       <>
         <Text style={styles.label}>飯店名稱 *</Text>
-        <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="住宿資訊" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          style={styles.input} value={form.title}
+          onChangeText={(v) => setField('title', v)}
+          placeholder="住宿資訊" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => bookingRefRef.current?.focus()}
+        />
 
         <Text style={styles.label}>訂位代號</Text>
-        <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="ABC123" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={bookingRefRef}
+          style={styles.input} value={form.booking_ref}
+          onChangeText={(v) => setField('booking_ref', v)}
+          placeholder="ABC123" placeholderTextColor={Colors.textLight}
+        />
 
         <Text style={styles.label}>Check-in</Text>
         {Platform.OS === 'web'
@@ -311,39 +446,107 @@ export default function BookingsScreen() {
           : <TextInput style={styles.input} value={form.check_out} onChangeText={(v) => setField('check_out', v)} placeholder="2026-04-21" placeholderTextColor={Colors.textLight} />}
 
         <Text style={styles.label}>住客</Text>
-        <MemberSelect />
+        <View style={styles.memberGrid}>
+          {members.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
+              onPress={() => toggleMember(m.display_name)}
+            >
+              <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+              <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+              {selectedMembers.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+            </TouchableOpacity>
+          ))}
+        </View>
       </>
     );
 
     if (activeTab === 'car') return (
       <>
         <Text style={styles.label}>租車公司 / 車型 *</Text>
-        <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="租車資訊" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          style={styles.input} value={form.title}
+          onChangeText={(v) => setField('title', v)}
+          placeholder="租車資訊" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => bookingRefRef.current?.focus()}
+        />
 
         <Text style={styles.label}>訂位代號</Text>
-        <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="ABC123" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={bookingRefRef}
+          style={styles.input} value={form.booking_ref}
+          onChangeText={(v) => setField('booking_ref', v)}
+          placeholder="ABC123" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => fromCityRef.current?.focus()}
+        />
 
         <Text style={styles.label}>取車地點</Text>
-        <TextInput style={styles.input} value={form.pickup} onChangeText={(v) => setField('pickup', v)} placeholder="岡山機場" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={fromCityRef}
+          style={styles.input} value={form.pickup}
+          onChangeText={(v) => setField('pickup', v)}
+          placeholder="岡山機場" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => toCityRef.current?.focus()}
+        />
 
         <Text style={styles.label}>還車地點</Text>
-        <TextInput style={styles.input} value={form.dropoff} onChangeText={(v) => setField('dropoff', v)} placeholder="廣島市區" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={toCityRef}
+          style={styles.input} value={form.dropoff}
+          onChangeText={(v) => setField('dropoff', v)}
+          placeholder="廣島市區" placeholderTextColor={Colors.textLight}
+        />
 
         <Text style={styles.label}>乘客</Text>
-        <MemberSelect />
+        <View style={styles.memberGrid}>
+          {members.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
+              onPress={() => toggleMember(m.display_name)}
+            >
+              <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+              <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+              {selectedMembers.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+            </TouchableOpacity>
+          ))}
+        </View>
       </>
     );
 
     return (
       <>
         <Text style={styles.label}>憑證名稱 *</Text>
-        <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="景點門票 / 體驗券" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          style={styles.input} value={form.title}
+          onChangeText={(v) => setField('title', v)}
+          placeholder="景點門票 / 體驗券" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => bookingRefRef.current?.focus()}
+        />
 
         <Text style={styles.label}>序號 / 兌換碼</Text>
-        <TextInput style={styles.input} value={form.booking_ref} onChangeText={(v) => setField('booking_ref', v)} placeholder="VOUCHER123" placeholderTextColor={Colors.textLight} />
+        <TextInput
+          ref={bookingRefRef}
+          style={styles.input} value={form.booking_ref}
+          onChangeText={(v) => setField('booking_ref', v)}
+          placeholder="VOUCHER123" placeholderTextColor={Colors.textLight}
+        />
 
         <Text style={styles.label}>適用人</Text>
-        <MemberSelect />
+        <View style={styles.memberGrid}>
+          {members.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
+              onPress={() => toggleMember(m.display_name)}
+            >
+              <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+              <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+              {selectedMembers.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+            </TouchableOpacity>
+          ))}
+        </View>
       </>
     );
   };
@@ -388,14 +591,21 @@ export default function BookingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>新增{BOOKING_TYPES[activeTab]}</Text>
+            <Text style={styles.modalTitle}>{editingBooking ? '編輯' : '新增'}{BOOKING_TYPES[activeTab]}</Text>
 
             {renderForm()}
 
             <View style={styles.rowFields}>
               <View style={{ flex: 2 }}>
                 <Text style={styles.label}>金額</Text>
-                <TextInput style={styles.input} value={form.amount} onChangeText={(v) => setField('amount', v)} placeholder="13947" placeholderTextColor={Colors.textLight} keyboardType="numeric" />
+                <TextInput
+                  ref={amountRef}
+                  style={styles.input} value={form.amount}
+                  onChangeText={(v) => setField('amount', v)}
+                  placeholder="13947" placeholderTextColor={Colors.textLight}
+                  keyboardType="numeric"
+                  returnKeyType="next" onSubmitEditing={() => noteRef.current?.focus()}
+                />
               </View>
               <View style={{ width: 10 }} />
               <View style={{ flex: 1 }}>
@@ -406,17 +616,36 @@ export default function BookingsScreen() {
 
             <Text style={styles.label}>備注</Text>
             <TextInput
+              ref={noteRef}
               style={[styles.input, { height: 68, textAlignVertical: 'top', paddingTop: 10 }]}
               value={form.note} onChangeText={(v) => setField('note', v)}
               placeholder="補充說明..." placeholderTextColor={Colors.textLight} multiline
             />
 
+            <Text style={styles.label}>可見成員（空白 = 所有人可見）</Text>
+            <View style={styles.memberGrid}>
+              {members.map((m) => (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.memberChip, visibleTo.has(m.display_name) && styles.memberChipSelected]}
+                  onPress={() => toggleVisibleTo(m.display_name)}
+                >
+                  <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+                  <Text style={[styles.chipText, visibleTo.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+                  {visibleTo.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            {visibleTo.size > 0 && (
+              <Text style={styles.visibleHint}>🔒 僅選中的成員可看到此預訂</Text>
+            )}
+
             <View style={styles.modalBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelText}>取消</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.createBtn} onPress={handleAdd}>
-                <Text style={styles.createText}>新增</Text>
+              <TouchableOpacity style={styles.createBtn} onPress={handleSave}>
+                <Text style={styles.createText}>{editingBooking ? '儲存' : '新增'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -464,6 +693,12 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, flexWrap: 'wrap', gap: 4 },
   footerNote: { fontSize: 12, color: Colors.textSecondary, flex: 1 },
   footerAmount: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  cardActions: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8 },
+  visibleTag: { fontSize: 11, color: Colors.textSecondary, flex: 1 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.primaryLight },
+  editBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  deleteBtnText: { fontSize: 12, color: Colors.danger, fontWeight: '500' },
   empty: { alignItems: 'center', marginTop: 60 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 16, color: Colors.textSecondary },
@@ -484,6 +719,7 @@ const styles = StyleSheet.create({
   memberChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   memberChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { fontSize: 13, color: Colors.textSecondary },
+  visibleHint: { fontSize: 12, color: Colors.textSecondary, marginTop: 6, fontStyle: 'italic' },
   modalBtns: { flexDirection: 'row', marginTop: 24, gap: 12 },
   cancelBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   cancelText: { color: Colors.textSecondary, fontSize: 16 },

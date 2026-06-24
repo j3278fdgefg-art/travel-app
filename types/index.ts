@@ -58,6 +58,9 @@ export interface Booking {
   member_names: string;
   note: string;
   created_at: string;
+  created_by_user_id?: string;
+  created_by_name?: string;
+  visible_to_members?: string;
 }
 
 export interface Expense {
