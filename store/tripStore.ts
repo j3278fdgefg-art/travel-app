@@ -223,7 +223,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   addItineraryItem: async (item) => {
     const { data, error } = await supabase.from('itinerary_items').insert(item).select().single();
-    if (error) console.error('addItineraryItem error:', error);
+    if (error) { alert('新增失敗：' + error.message); return; }
     if (data) set((s) => ({ items: [...s.items, data] }));
   },
 

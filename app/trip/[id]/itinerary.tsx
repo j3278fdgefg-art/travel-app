@@ -256,7 +256,8 @@ export default function ItineraryScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.title || !form.time) return;
+    if (!form.title) { alert('請填寫行程名稱'); return; }
+    if (!form.time) { alert('請填寫時間'); return; }
     const day = days[selectedDay];
     if (!day) return;
     if (editingItem) {
