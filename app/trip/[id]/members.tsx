@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Modal, TextInput,
 } from 'react-native';
-import { useGlobalSearchParams } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { Colors } from '../../../constants/colors';
@@ -14,10 +14,21 @@ import { supabase } from '../../../lib/supabase';
 
 const AVATARS = ['😀','👑','👨','👩','👦','👧','🧔','👴','👵','🧒','🧑','🤵','👸','🦸','🧙','👮','🧑‍💼','🧑‍🍳','🧑‍🎤'];
 
+// 時間窗口邀請碼（每 5 分鐘換一次）
+function inviteToken(tripId: string): string {
+  const win = Math.floor(Date.now() / 300000);
+  return btoa(`${tripId}:${win}`).replace(/[=+/]/g, '');
+}
+export function verifyInviteToken(tripId: string, token: string): boolean {
+  const win = Math.floor(Date.now() / 300000);
+  return [win, win - 1].some((w) => btoa(`${tripId}:${w}`).replace(/[=+/]/g, '') === token);
+}
+
 export default function MembersScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { members, currentTrip, activityLogs, fetchMembers, fetchActivityLogs, fetchTripById, addMember, removeMember } = useTripStore();
+  const { members, currentTrip, activityLogs, fetchMembers, fetchActivityLogs, fetchTripById, addMember, removeMember, logActivity } = useTripStore();
   const { user } = useAuthStore();
+  const router = useRouter();
   const id = params.id || currentTrip?.id || '';
   const isOwner = currentTrip?.owner_id === user?.id;
   const ownerAutoAdded = useRef(false);
@@ -84,7 +95,6 @@ export default function MembersScreen() {
   const handleSave = async () => {
     if (!name.trim()) return;
 
-    // 名稱不能重複
     const duplicate = members.some(
       (m) => m.display_name.trim() === name.trim() && (!editingMember || m.id !== editingMember.id)
     );
@@ -93,12 +103,31 @@ export default function MembersScreen() {
       return;
     }
 
+    const actorName = user?.email || '主辦人';
+
     if (editingMember) {
+      const oldName = editingMember.display_name;
+      const newName = name.trim();
       const { error } = await supabase.from('trip_members').update({
-        display_name: name.trim(), avatar_emoji: avatar,
-        email: email.trim() || null, line_id: lineId.trim() || null, ig_handle: igHandle.trim() || null,
+        display_name: newName, avatar_emoji: avatar,
+        ...(isOwner ? { email: email.trim() || null } : {}),
+        line_id: lineId.trim() || null, ig_handle: igHandle.trim() || null,
       }).eq('id', editingMember.id);
       if (error) { alert('儲存失敗：' + error.message); return; }
+
+      // 名稱改了就同步更新 expenses 和 checklist 裡的舊名稱
+      if (newName !== oldName) {
+        await supabase.from('expenses').update({ paid_by_name: newName }).eq('trip_id', id).eq('paid_by_name', oldName);
+        const { data: exps } = await supabase.from('expenses').select('id, shared_with').eq('trip_id', id);
+        for (const exp of exps || []) {
+          if (Array.isArray(exp.shared_with) && exp.shared_with.includes(oldName)) {
+            await supabase.from('expenses').update({ shared_with: exp.shared_with.map((n: string) => n === oldName ? newName : n) }).eq('id', exp.id);
+          }
+        }
+        await supabase.from('checklist_items').update({ member_name: newName }).eq('trip_id', id).eq('member_name', oldName);
+      }
+
+      await logActivity(id, actorName, '編輯成員', `${oldName}${newName !== oldName ? ` → ${newName}` : ''}`);
       await fetchMembers(id);
     } else {
       const { error } = await supabase.from('trip_members').insert({
@@ -106,18 +135,29 @@ export default function MembersScreen() {
         email: email.trim() || null, line_id: lineId.trim() || null, ig_handle: igHandle.trim() || null,
       } as any);
       if (error) { alert('新增失敗：' + error.message); return; }
+      await logActivity(id, actorName, '新增成員', name.trim());
       await fetchMembers(id);
     }
     setModalVisible(false);
   };
 
+  const handleLeave = async () => {
+    const ownerMem = members.find((m) => m.role === 'owner' && m.user_id === user?.id);
+    if (!ownerMem) return;
+    if (window.confirm('確定要退出這個行程嗎？行程仍會保留，但你將從成員列表中移除。')) {
+      await removeMember(ownerMem.id);
+      setModalVisible(false);
+      router.replace('/trips');
+    }
+  };
+
   const handleRemove = (m: TripMember) => {
+    if (!isOwner) return;
     if (window.confirm(`確定要移除 ${m.display_name}？`)) removeMember(m.id);
   };
 
-  const joinUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/join/${id}`
-    : `https://travel-app-app.vercel.app/join/${id}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://travel-app-app.vercel.app';
+  const joinUrl = `${origin}/join/${id}?t=${inviteToken(id)}`;
   const shareMessage = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${joinUrl}`;
   const encodedMsg = encodeURIComponent(shareMessage);
 
@@ -205,9 +245,11 @@ export default function MembersScreen() {
                   <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(m)}>
                     <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
-                    <Ionicons name="trash-outline" size={13} color={Colors.danger} />
-                  </TouchableOpacity>
+                  {isOwner && (
+                    <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
+                      <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             ))}
@@ -267,16 +309,20 @@ export default function MembersScreen() {
               placeholderTextColor={Colors.textLight}
             />
 
-            <Text style={styles.label}>App 帳號（email，選填）</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="例：friend@gmail.com"
-              placeholderTextColor={Colors.textLight}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+            {isOwner && (
+              <>
+                <Text style={styles.label}>App 帳號（email，選填）</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="例：friend@gmail.com"
+                  placeholderTextColor={Colors.textLight}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </>
+            )}
 
             <Text style={styles.label}>LINE ID（選填）</Text>
             <TextInput
@@ -315,6 +361,12 @@ export default function MembersScreen() {
                 <Text style={styles.createText}>{editingMember ? '儲存' : '新增'}</Text>
               </TouchableOpacity>
             </View>
+
+            {editingMember?.role === 'owner' && editingMember?.user_id === user?.id && (
+              <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
+                <Text style={styles.leaveText}>退出行程</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -375,4 +427,6 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
   createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  leaveBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 10 },
+  leaveText: { color: Colors.danger, fontSize: 14 },
 });

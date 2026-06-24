@@ -4,9 +4,10 @@ import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
+import { verifyInviteToken } from '../trip/[id]/members';
 
 export default function JoinTripScreen() {
-  const { id } = useGlobalSearchParams<{ id: string }>();
+  const { id, t } = useGlobalSearchParams<{ id: string; t: string }>();
   const { user, loading: authLoading } = useAuthStore();
   const router = useRouter();
   const [trip, setTrip] = useState<any>(null);
@@ -20,6 +21,13 @@ export default function JoinTripScreen() {
 
   const loadTrip = async () => {
     setStatus('loading');
+
+    // 驗證邀請碼（5 分鐘有效）
+    if (!id || !t || !verifyInviteToken(id, t)) {
+      setStatus('error');
+      return;
+    }
+
     const { data: tripData } = await supabase.from('trips').select('*').eq('id', id).single();
     if (!tripData) { setStatus('error'); return; }
     setTrip(tripData);
@@ -73,9 +81,9 @@ export default function JoinTripScreen() {
   if (status === 'error') {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.emoji}>❌</Text>
-        <Text style={styles.title}>找不到行程</Text>
-        <Text style={styles.sub}>連結可能已失效</Text>
+        <Text style={styles.emoji}>⏰</Text>
+        <Text style={styles.title}>連結已失效</Text>
+        <Text style={styles.sub}>邀請連結每 5 分鐘更新一次{'\n'}請向主辦人索取新連結</Text>
         <TouchableOpacity style={styles.btn} onPress={() => router.replace('/trips' as any)}>
           <Text style={styles.btnText}>回首頁</Text>
         </TouchableOpacity>
