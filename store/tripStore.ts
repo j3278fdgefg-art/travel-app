@@ -203,8 +203,9 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   addExpense: async (expense) => {
     const { data, error } = await supabase.from('expenses').insert(expense).select().single();
-    if (error) console.error('addExpense error:', error);
+    if (error) { console.error('addExpense error:', error); alert('新增失敗：' + error.message); return false; }
     if (data) set((s) => ({ expenses: [data, ...s.expenses] }));
+    return true;
   },
 
   addChecklistItem: async (item) => {

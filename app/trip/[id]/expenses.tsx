@@ -17,6 +17,13 @@ const LEGACY_CAT_EMOJI: Record<string, string> = {
 };
 const catEmoji = (c: string) => LEGACY_CAT_EMOJI[c] || c;
 
+// emoji → DB 合法 category 值（自訂 emoji 一律存 other）
+const EMOJI_TO_DB_CAT: Record<string, string> = {
+  '🍽️': 'food', '🚗': 'transport', '🏨': 'accommodation',
+  '🛍️': 'shopping', '🎡': 'activity', '🛡️': 'insurance', '📌': 'other',
+};
+const toDbCategory = (emoji: string): string => EMOJI_TO_DB_CAT[emoji] ?? 'other';
+
 const DEFAULT_EXPENSE_CATS = ['🏨', '🍽️', '🚗'];
 
 function loadExpenseCats(userId: string): string[] {
@@ -202,25 +209,31 @@ export default function ExpensesScreen() {
 
     const sharedWith = form.sharedWith.length > 0 ? form.sharedWith : [form.paidBy || ownerName];
 
+    const dbCategory = toDbCategory(form.category);
+
     if (editingExpense) {
       await updateExpense(editingExpense.id, {
         title: form.title, amount: amtNum, currency: form.currency,
         amount_twd: Math.round(amtNum * rate), paid_by_name: form.paidBy,
-        payment_method: form.payMethod, category: form.category, date: form.date,
+        payment_method: form.payMethod, category: dbCategory, date: form.date,
         shared_with: sharedWith, note: form.note,
       } as any);
       await logActivity(id, ownerName, '編輯消費', `修改「${form.title}」`);
+      setSaving(false);
+      setModalVisible(false);
     } else {
-      await addExpense({
+      const ok = await addExpense({
         trip_id: id, title: form.title, amount: amtNum, currency: form.currency,
         amount_twd: Math.round(amtNum * rate), paid_by_name: form.paidBy || ownerName,
-        payment_method: form.payMethod, category: form.category, date: form.date,
+        payment_method: form.payMethod, category: dbCategory, date: form.date,
         shared_with: sharedWith, note: form.note,
       } as any);
-      await logActivity(id, form.paidBy || ownerName, '新增消費', `${form.title} ${form.currency} ${amtNum.toLocaleString()}`);
+      setSaving(false);
+      if (ok) {
+        await logActivity(id, form.paidBy || ownerName, '新增消費', `${form.title} ${form.currency} ${amtNum.toLocaleString()}`);
+        setModalVisible(false);
+      }
     }
-    setSaving(false);
-    setModalVisible(false);
   };
 
   const handleDelete = (e: Expense) => {
