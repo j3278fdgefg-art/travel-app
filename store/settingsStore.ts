@@ -14,9 +14,9 @@ function loadBg(): BgVariant {
 
 function loadKakaoKey(): string {
   try {
-    return localStorage.getItem('kakao_app_key') || '';
+    return localStorage.getItem('kakao_app_key') || '52d43b8e1afce47c2d5242fdfa438596';
   } catch {}
-  return '';
+  return '52d43b8e1afce47c2d5242fdfa438596';
 }
 
 interface SettingsState {
@@ -32,7 +32,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try { localStorage.setItem(KEY, b); } catch {}
     set({ background: b });
   },
-  kakaoAppKey: typeof localStorage !== 'undefined' ? loadKakaoKey() : '',
+  kakaoAppKey: typeof localStorage !== 'undefined' ? loadKakaoKey() : '52d43b8e1afce47c2d5242fdfa438596',
   setKakaoAppKey: (key) => {
     try { localStorage.setItem('kakao_app_key', key); } catch {}
     set({ kakaoAppKey: key });
