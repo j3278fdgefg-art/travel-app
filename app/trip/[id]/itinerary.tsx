@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { PageBackground } from '../../../components/PageBackground';
 import { ItineraryItem } from '../../../types';
 
 const WMO_EMOJI: Record<number, { emoji: string; label: string }> = {
@@ -229,6 +231,7 @@ export default function ItineraryScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem } = useTripStore();
   const { user } = useAuthStore();
+  const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
 
   const [selectedDay, setSelectedDay] = useState(0);
@@ -380,6 +383,7 @@ export default function ItineraryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/trips')} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#fff" />

@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { PageBackground } from '../../../components/PageBackground';
 import { CURRENCIES, EXCHANGE_RATES, Expense } from '../../../types';
 
 const LEGACY_CAT_EMOJI: Record<string, string> = {
@@ -101,6 +103,7 @@ export default function ExpensesScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, expenses, members, fetchExpenses, fetchMembers, fetchTripById, addExpense, deleteExpense, updateExpense, logActivity } = useTripStore();
   const { user } = useAuthStore();
+  const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const isOwner = currentTrip?.owner_id != null && user?.id != null && currentTrip.owner_id === user.id;
 
@@ -248,6 +251,7 @@ export default function ExpensesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       {/* 頂部總計 */}
       <View style={styles.totalCard}>
         <View style={{ flex: 1 }}>

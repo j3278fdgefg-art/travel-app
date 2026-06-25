@@ -5,10 +5,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useTripStore } from '../../store/tripStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { PageBackground } from '../../components/PageBackground';
 import { Trip } from '../../types';
 
 const DEFAULT_TRIP_EMOJIS = ['✈️', '🚗', '🗺️'];
@@ -35,6 +38,7 @@ export default function TripsScreen() {
   const { height: winHeight } = useWindowDimensions();
   const { user, signOut } = useAuthStore();
   const { trips, loading, fetchTrips, createTrip, setCurrentTrip, deleteTrip } = useTripStore();
+  const { background } = useSettingsStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
@@ -126,13 +130,19 @@ export default function TripsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>我的旅程</Text>
         </View>
-        <TouchableOpacity onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} style={styles.signOutBtn}>
-          <Text style={styles.signOutText}>登出</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={() => router.push('/settings' as any)} style={styles.signOutBtn}>
+            <Ionicons name="settings-outline" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} style={styles.signOutBtn}>
+            <Text style={styles.signOutText}>登出</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (

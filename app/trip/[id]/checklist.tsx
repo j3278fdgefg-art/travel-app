@@ -7,6 +7,8 @@ import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { PageBackground } from '../../../components/PageBackground';
 import { ChecklistItem } from '../../../types';
 
 const TABS: Array<{ key: ChecklistItem['type']; label: string; emoji: string }> = [
@@ -24,6 +26,7 @@ const SUGGESTIONS: Record<ChecklistItem['type'], string[]> = {
 export default function ChecklistScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, checklist, members, fetchChecklist, fetchMembers, addChecklistItem, toggleChecklistItem, deleteChecklistItem, updateChecklistItem } = useTripStore();
+  const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const [activeTab, setActiveTab] = useState<ChecklistItem['type']>('todo');
   const [filterMember, setFilterMember] = useState<string | null>(null);
@@ -74,6 +77,7 @@ export default function ChecklistScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       <View style={{ height: 12 }} />
 
       <View style={styles.tabs}>

@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { PageBackground } from '../../../components/PageBackground';
 import { Booking, BOOKING_TYPES } from '../../../types';
 
 const TABS: Array<{ key: Booking['type']; label: string; emoji: string }> = [
@@ -108,6 +110,7 @@ export default function BookingsScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking, updateBooking, deleteBooking } = useTripStore();
   const { user } = useAuthStore();
+  const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const [activeTab, setActiveTab] = useState<Booking['type']>('flight');
   const [modalVisible, setModalVisible] = useState(false);
@@ -577,6 +580,7 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       <View style={{ height: 12 }} />
 
       <View style={styles.tabs}>

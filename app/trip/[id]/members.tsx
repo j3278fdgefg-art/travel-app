@@ -9,6 +9,8 @@ import dayjs from 'dayjs';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useSettingsStore } from '../../../store/settingsStore';
+import { PageBackground } from '../../../components/PageBackground';
 import { TripMember } from '../../../types';
 import { supabase } from '../../../lib/supabase';
 
@@ -20,6 +22,7 @@ export default function MembersScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
   const { members, currentTrip, activityLogs, fetchMembers, fetchActivityLogs, fetchTripById, addMember, removeMember, logActivity } = useTripStore();
   const { user } = useAuthStore();
+  const { background } = useSettingsStore();
   const router = useRouter();
   const id = params.id || currentTrip?.id || '';
   const isOwner = currentTrip?.owner_id === user?.id;
@@ -217,6 +220,7 @@ export default function MembersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <PageBackground variant={background} />
       <ScrollView>
         {/* 旅程標題卡 */}
         <View style={styles.tripHeader}>
