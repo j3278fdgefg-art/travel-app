@@ -442,6 +442,7 @@ export default function ExpensesScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>💰</Text>
             <Text style={styles.emptyText}>還沒有消費記錄</Text>
+            <Text style={styles.emptySubtext}>點擊右下角 ＋ 記下第一筆花費</Text>
           </View>
         )}
       </ScrollView>
@@ -633,7 +634,8 @@ const styles = StyleSheet.create({
   deleteBtnText: { color: Colors.danger, fontSize: 13 },
   empty: { alignItems: 'center', marginTop: 60 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: Colors.textSecondary },
+  emptyText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
+  emptySubtext: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   ownerNote: { textAlign: 'center', fontSize: 12, color: Colors.textSecondary, paddingVertical: 8 },
   fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
