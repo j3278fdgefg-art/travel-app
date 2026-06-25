@@ -7,6 +7,18 @@ import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 
+async function geocodePlace(name: string): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1`);
+    const data = await res.json();
+    if (data.results?.length) {
+      const r = data.results[0];
+      return { latitude: r.latitude, longitude: r.longitude };
+    }
+  } catch {}
+  return null;
+}
+
 const TYPE_META: Record<string, { emoji: string; label: string }> = {
   transport: { emoji: '🚃', label: '交通' },
   accommodation: { emoji: '🏨', label: '住宿' },
@@ -57,16 +69,22 @@ export default function MapScreen() {
   };
 
   // 跳轉 Naver 地圖導航到指定地點
-  const navigateTo = (place: string) => {
+  // 先 geocode 取座標（座標沒有語言問題），失敗時退回 Google Maps
+  const navigateTo = async (place: string) => {
     if (!place) return;
+    const geo = await geocodePlace(place);
     const ua = navigator.userAgent;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
-    const webUrl = `https://map.naver.com/v5/search/${encodeURIComponent(place)}`;
-    if (isMobile) {
-      window.location.href = `nmap://search?query=${encodeURIComponent(place)}&appname=com.travelapp`;
-      setTimeout(() => { window.open(webUrl, '_blank'); }, 1200);
+    if (geo) {
+      const { latitude: lat, longitude: lng } = geo;
+      if (isMobile) {
+        window.location.href = `nmap://route/walk?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(place)}&appname=com.travelapp`;
+        setTimeout(() => { window.open(`https://map.naver.com/p/search/${lat},${lng}`, '_blank'); }, 1200);
+      } else {
+        window.open(`https://map.naver.com/p/search/${lat},${lng}`, '_blank');
+      }
     } else {
-      window.open(webUrl, '_blank');
+      window.open(`https://www.google.com/maps/search/?q=${encodeURIComponent(place)}`, '_blank');
     }
   };
 
