@@ -516,6 +516,9 @@ export default function MapScreen() {
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>⚠️ Kakao 地圖載入失敗 (已自動切換 Google 地圖備用)</Text>
           <Text style={styles.warningDetail}>{kakaoError}</Text>
+          <Text style={[styles.warningDetail, { marginTop: 4, fontWeight: '700' }]}>
+            目前使用的金鑰為: "{kakaoAppKey || '(空)'}"
+          </Text>
           <Text style={styles.warningTip}>
             提示：使用 Kakao 地圖需於 Kakao Developers 註冊您的 Web 平台網域 (例如：https://travel-app-seven-chi.vercel.app)。
           </Text>

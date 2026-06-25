@@ -68,7 +68,7 @@ export default function SettingsScreen() {
             onChangeText={setKakaoAppKey}
             placeholder="請貼上您的 JavaScript App Key"
             placeholderTextColor={Colors.textLight}
-            secureTextEntry={true}
+            secureTextEntry={false}
             autoCapitalize="none"
             autoCorrect={false}
           />
