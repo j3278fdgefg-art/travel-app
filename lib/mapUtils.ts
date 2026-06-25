@@ -8,6 +8,22 @@ export function isNaverMapUrl(url: string): boolean {
   return url.includes('naver.com') || url.includes('naver.me');
 }
 
+export function isKakaoMapUrl(url: string): boolean {
+  if (!url) return false;
+  return url.includes('map.kakao.com') || url.includes('place.map.kakao.com') || url.includes('kko.to');
+}
+
+export function extractPlaceFromKakaoUrl(url: string): string | null {
+  if (!url) return null;
+  // https://map.kakao.com/link/search/PLACE_NAME
+  const linkSearchMatch = url.match(/\/link\/search\/([^?&#]+)/);
+  if (linkSearchMatch) return decodeURIComponent(linkSearchMatch[1].replace(/\+/g, ' '));
+  // https://map.kakao.com/?q=PLACE_NAME
+  const qMatch = url.match(/[?&]q=([^&#]+)/);
+  if (qMatch) return decodeURIComponent(qMatch[1].replace(/\+/g, ' '));
+  return null;
+}
+
 export function extractUrl(text: string): string | null {
   if (!text) return null;
   const match = text.match(/(https?:\/\/[^\s]+)/);
@@ -77,7 +93,19 @@ export function getMapQuery(item: { location?: string; location_url?: string; ti
     return `${coords.latitude},${coords.longitude}`;
   }
 
-  // 2. 若 location 是 Google 地圖網址，嘗試解析出地名
+  // 2. 若 location 是 Kakao 地圖網址，提取地名
+  if (isKakaoMapUrl(place)) {
+    const name = extractPlaceFromKakaoUrl(place);
+    return name || item.title;
+  }
+
+  // 3. 若 location_url 是 Kakao 地圖網址，提取地名
+  if (isKakaoMapUrl(url)) {
+    const name = extractPlaceFromKakaoUrl(url);
+    return name || item.title;
+  }
+
+  // 4. 若 location 是 Google 地圖網址，嘗試解析出地名
   if (isGoogleMapsUrl(place)) {
     const parsed = parseGoogleMapsUrl(place);
     if (parsed && parsed.placeName && !isGoogleMapsUrl(parsed.placeName)) {
@@ -85,7 +113,7 @@ export function getMapQuery(item: { location?: string; location_url?: string; ti
     }
   }
 
-  // 3. 若 location_url 是 Google 地圖網址，嘗試解析出地名
+  // 5. 若 location_url 是 Google 地圖網址，嘗試解析出地名
   if (isGoogleMapsUrl(url)) {
     const parsed = parseGoogleMapsUrl(url);
     if (parsed && parsed.placeName && !isGoogleMapsUrl(parsed.placeName)) {
@@ -93,6 +121,6 @@ export function getMapQuery(item: { location?: string; location_url?: string; ti
     }
   }
 
-  // 4. 退路：直接使用 location 字串或行程標題
+  // 6. 退路：直接使用 location 字串或行程標題
   return place || item.title;
 }
