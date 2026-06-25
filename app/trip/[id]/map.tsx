@@ -6,6 +6,15 @@ import {
 import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { ItineraryItem } from '../../../types';
+import {
+  extractUrl,
+  isNaverMapUrl,
+  isGoogleMapsUrl,
+  extractCoordsFromUrl,
+  parseGoogleMapsUrl,
+  getMapQuery,
+} from '../../../lib/mapUtils';
 
 async function geocodePlace(name: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
@@ -69,28 +78,78 @@ export default function MapScreen() {
   };
 
   // 跳轉 Naver 地圖導航到指定地點
-  // 先 geocode 取座標（座標沒有語言問題），失敗時退回 Google Maps
-  const navigateTo = async (place: string) => {
-    if (!place) return;
-    const geo = await geocodePlace(place);
+  // 優先解析 Google Maps 座標或 Naver 地圖連結，最後才嘗試 geocode 或退回 Naver 地圖搜尋
+  const navigateTo = async (item: ItineraryItem) => {
+    const place = item.location || '';
+    const locationUrl = item.location_url || '';
+
+    // 1. 優先從 location_url 或 location 提取可能包含的網址
+    const url = extractUrl(locationUrl) || extractUrl(place);
+
     const ua = navigator.userAgent;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
-    if (geo) {
-      const { latitude: lat, longitude: lng } = geo;
+
+    // 導航跳轉 helper
+    const openNaverNav = (lat: number, lng: number, name: string) => {
       if (isMobile) {
-        window.location.href = `nmap://route/walk?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(place)}&appname=com.travelapp`;
-        setTimeout(() => { window.open(`https://map.naver.com/p/search/${lat},${lng}`, '_blank'); }, 1200);
+        window.location.href = `nmap://route/walk?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name)}&appname=com.travelapp`;
+        setTimeout(() => {
+          window.open(`https://map.naver.com/p/search/${lat},${lng}`, '_blank');
+        }, 1200);
       } else {
         window.open(`https://map.naver.com/p/search/${lat},${lng}`, '_blank');
       }
-    } else {
-      window.open(`https://www.google.com/maps/search/?q=${encodeURIComponent(place)}`, '_blank');
+    };
+
+    // 2. 如果是 Naver 地圖網址，直接開啟
+    if (url && isNaverMapUrl(url)) {
+      window.open(url, '_blank');
+      return;
     }
+
+    // 3. 如果是 Google 地圖網址，嘗試解析出經緯度座標
+    if (url && isGoogleMapsUrl(url)) {
+      const coords = extractCoordsFromUrl(url);
+      if (coords) {
+        openNaverNav(coords.latitude, coords.longitude, place || item.title);
+        return;
+      }
+      // 沒有座標，嘗試從網址中解析出景點地名，用 Naver 地圖搜尋
+      const parsed = parseGoogleMapsUrl(url);
+      if (parsed && parsed.placeName && !isGoogleMapsUrl(parsed.placeName)) {
+        window.open(`https://map.naver.com/p/search/${encodeURIComponent(parsed.placeName)}`, '_blank');
+        return;
+      }
+    }
+
+    // 4. 若 location 存放的是 Google 地圖網址，嘗試解析座標 (防呆)
+    if (isGoogleMapsUrl(place)) {
+      const coords = extractCoordsFromUrl(place);
+      if (coords) {
+        openNaverNav(coords.latitude, coords.longitude, item.title);
+        return;
+      }
+    }
+
+    // 5. 若為純文字或座標解析失敗，嘗試將 place 作為地名進行 geocode
+    if (place && !isGoogleMapsUrl(place)) {
+      const geo = await geocodePlace(place);
+      if (geo) {
+        openNaverNav(geo.latitude, geo.longitude, place);
+        return;
+      }
+    }
+
+    // 6. 退路：直接以地名在 Naver 地圖搜尋 (Naver 地圖支援中文景點，比退回 Google Maps 更好用)
+    const cleanPlace = place && !isGoogleMapsUrl(place) ? place : item.title;
+    window.open(`https://map.naver.com/p/search/${encodeURIComponent(cleanPlace)}`, '_blank');
   };
 
   // 點行程地點 → 把 Google 內嵌地圖移到該地點
-  const showOnMap = (loc: string) => {
-    setQuery(loc); setMapKey((k) => k + 1);
+  const showOnMap = (item: ItineraryItem) => {
+    const mapQuery = getMapQuery(item);
+    setQuery(mapQuery);
+    setMapKey((k) => k + 1);
   };
 
   // 行程地點：取有填 location 的行程項目
@@ -149,7 +208,7 @@ export default function MapScreen() {
                   const meta = typeMeta(item.type);
                   return (
                     <View key={item.id} style={styles.placeChip}>
-                      <TouchableOpacity activeOpacity={0.7} onPress={() => showOnMap(item.location!)}>
+                      <TouchableOpacity activeOpacity={0.7} onPress={() => showOnMap(item)}>
                         <View style={styles.placeChipTop}>
                           <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
                           {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
@@ -160,7 +219,7 @@ export default function MapScreen() {
                           <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
                         </View>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.placeNavBtn} onPress={() => navigateTo(item.location!)}>
+                      <TouchableOpacity style={styles.placeNavBtn} onPress={() => navigateTo(item)}>
                         <Text style={styles.placeNavText}>🧭 Naver 導航</Text>
                       </TouchableOpacity>
                     </View>

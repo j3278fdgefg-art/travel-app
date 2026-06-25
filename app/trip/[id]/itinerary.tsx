@@ -12,6 +12,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { PageBackground } from '../../../components/PageBackground';
 import { ItineraryItem } from '../../../types';
+import { isGoogleMapsUrl, parseGoogleMapsUrl, getMapQuery } from '../../../lib/mapUtils';
 
 const WMO_EMOJI: Record<number, { emoji: string; label: string }> = {
   0: { emoji: '☀️', label: '晴天' },
@@ -207,23 +208,7 @@ function saveItemTypes(userId: string, list: string[]) {
   localStorage.setItem(`item_types_${userId}`, JSON.stringify(list));
 }
 
-// 從 Google Maps URL 解析地點名稱和搜尋關鍵字
-function parseGoogleMapsUrl(url: string): { placeName: string; searchQuery: string } | null {
-  if (!url.includes('google.com/maps') && !url.includes('maps.app.goo') && !url.includes('goo.gl/maps')) return null;
-  // 解析 /place/地點名稱/
-  const placeMatch = url.match(/\/place\/([^/@?]+)/);
-  if (placeMatch) {
-    const name = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
-    return { placeName: name, searchQuery: name };
-  }
-  // 解析 ?q= 參數
-  const qMatch = url.match(/[?&]q=([^&]+)/);
-  if (qMatch) {
-    const name = decodeURIComponent(qMatch[1].replace(/\+/g, ' '));
-    return { placeName: name, searchQuery: name };
-  }
-  return { placeName: url, searchQuery: url };
-}
+
 
 const emptyForm = () => ({
   time: '', title: '', location: '', locationUrl: '', note: '',
@@ -373,7 +358,7 @@ export default function ItineraryScreen() {
       time: item.time,
       title: item.title,
       location: item.location || '',
-      locationUrl: (item as any).location_url || '',
+      locationUrl: item.location_url || '',
       note: item.note || '',
       type: item.type,
     });
@@ -390,12 +375,14 @@ export default function ItineraryScreen() {
     if (editingItem) {
       await updateItineraryItem(editingItem.id, {
         time: form.time, title: form.title, location: form.location,
+        location_url: form.locationUrl,
         note: form.note, type: toDbType(form.type) as any,
       });
     } else {
       await addItineraryItem({
         trip_id: id, day_id: day.id,
         time: form.time, title: form.title, location: form.location,
+        location_url: form.locationUrl,
         note: form.note, type: toDbType(form.type) as any,
         order_index: currentDayItems.length,
       });
@@ -408,7 +395,7 @@ export default function ItineraryScreen() {
   };
 
   const openInMap = (item: ItineraryItem) => {
-    const q = item.location || item.title;
+    const q = getMapQuery(item);
     router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
 

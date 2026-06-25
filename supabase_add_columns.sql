@@ -17,3 +17,7 @@ alter table trips add column if not exists permanent_invite_token text;
 alter table bookings add column if not exists created_by_user_id uuid;
 alter table bookings add column if not exists created_by_name text;
 alter table bookings add column if not exists visible_to_members text;
+
+-- 新增 itinerary_items 的 location_url 欄位
+alter table itinerary_items add column if not exists location_url text;
+
