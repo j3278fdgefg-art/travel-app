@@ -98,13 +98,21 @@ export default function MapScreen() {
     <SafeAreaView style={styles.container}>
       <View style={{ height: 12 }} />
 
-      {/* 定位列 */}
+      {/* 上排：顯示/隱藏行程地點 + 定位 */}
       <View style={styles.topRow}>
-        <TouchableOpacity style={styles.locateWide} onPress={handleLocate} disabled={locating}>
+        {locationItems.length > 0 ? (
+          <TouchableOpacity style={styles.listToggle} onPress={() => setShowPanel((v) => !v)} activeOpacity={0.85}>
+            <Text style={styles.listToggleIcon}>📋</Text>
+            <Text style={styles.listToggleText}>
+              {showPanel ? '隱藏顯示地點' : `顯示行程地點（${locationItems.length}）`}
+            </Text>
+            <Text style={styles.listToggleChevron}>{showPanel ? '▴' : '▾'}</Text>
+          </TouchableOpacity>
+        ) : <View style={{ flex: 1 }} />}
+        <TouchableOpacity style={styles.locateBtn} onPress={handleLocate} disabled={locating}>
           {locating
             ? <ActivityIndicator size="small" color={Colors.primary} />
             : <Text style={styles.ctrlEmoji}>📍</Text>}
-          <Text style={styles.locateText}>{locating ? '定位中…' : '定位目前位置'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -161,17 +169,6 @@ export default function MapScreen() {
           allow="geolocation"
         />
       </View>
-
-      {/* 底部：顯示/收合行程地點 */}
-      {locationItems.length > 0 && (
-        <TouchableOpacity style={styles.bottomBar} onPress={() => setShowPanel((v) => !v)} activeOpacity={0.85}>
-          <Text style={styles.bottomBarIcon}>📋</Text>
-          <Text style={styles.bottomBarText}>
-            {showPanel ? '收合清單' : `顯示行程地點（${locationItems.length}）`}
-          </Text>
-          <Text style={styles.bottomBarChevron}>{showPanel ? '▾' : '▴'}</Text>
-        </TouchableOpacity>
-      )}
     </SafeAreaView>
   );
 }
@@ -181,9 +178,12 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
   ctrlEmoji: { fontSize: 17 },
-  topRow: { paddingHorizontal: 12, marginBottom: 8 },
-  locateWide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, borderRadius: 12, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
-  locateText: { fontSize: 14, color: Colors.text, fontWeight: '600' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, marginBottom: 8 },
+  listToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 14, backgroundColor: Colors.primary, shadowColor: Colors.primaryDark, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  listToggleIcon: { fontSize: 15 },
+  listToggleText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  listToggleChevron: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  locateBtn: { width: 46, height: 46, borderRadius: 12, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   panel: { marginHorizontal: 12, marginBottom: 8, backgroundColor: Colors.card, borderRadius: 16, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   panelTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
@@ -201,11 +201,7 @@ const styles = StyleSheet.create({
   noLocations: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 8 },
   placeNavBtn: { marginTop: 9, backgroundColor: Colors.primary, borderRadius: 9, paddingVertical: 7, alignItems: 'center' },
   placeNavText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6, backgroundColor: '#EAE7DF' },
-  bottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 12, marginBottom: 10, backgroundColor: Colors.primary, borderRadius: 16, height: 50, shadowColor: Colors.primaryDark, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  bottomBarIcon: { fontSize: 16 },
-  bottomBarText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  bottomBarChevron: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 10, backgroundColor: '#EAE7DF' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },

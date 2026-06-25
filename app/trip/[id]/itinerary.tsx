@@ -392,15 +392,11 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
-      {/* Day 卡（可收合）：點開才顯示天氣 */}
+      {/* Day 卡：目的地圖示 + Day N + 日期（天氣移到下方行程項目內） */}
       {currentTrip && days[selectedDay] && (() => {
         const day = days[selectedDay];
-        const w = weatherMap[day.date];
         const dest = currentTrip.destination || currentTrip.name || '';
-        const d = dayjs(day.date);
-        const wd = ['日', '一', '二', '三', '四', '五', '六'][d.day()];
-        const dateStr = `${d.format('M/D')} 星期${wd}`;
-        const wmo = w ? getWmo(w.code) : null;
+        const dateStr = dayjs(day.date).format('M/D');
         return (
           <View style={styles.dayCardWrap}>
             <TouchableOpacity style={styles.dayCard} activeOpacity={0.8} onPress={() => setDayExpanded((v) => !v)}>
@@ -411,27 +407,18 @@ export default function ItineraryScreen() {
                 <Text style={styles.dayCardTitle} numberOfLines={1}>Day {day.day_number}{dest ? ` · ${dest}` : ''}</Text>
                 <Text style={styles.dayCardDate}>{dateStr}</Text>
               </View>
-              <Text style={styles.dayChevron}>{dayExpanded ? '▾' : '▸'}</Text>
+              <Text style={styles.dayChevron}>{dayExpanded ? '▾' : '⚙'}</Text>
             </TouchableOpacity>
 
             {dayExpanded && (
               <View style={styles.dayDetail}>
-                {w && wmo ? (
-                  <View style={styles.weatherDetailRow}>
-                    <Text style={styles.weatherDetailItem}>{wmo.emoji} {wmo.label}</Text>
-                    <Text style={styles.weatherDetailItem}>🌡️ {w.max}° / {w.min}°</Text>
-                    <Text style={styles.weatherDetailItem}>🌧️ {w.rain}%</Text>
-                    {w.estimated && <Text style={styles.weatherDetailEst}>歷年同期估值</Text>}
-                  </View>
-                ) : (
-                  <Text style={styles.weatherDetailNone}>{weatherLoading ? '天氣載入中…' : '查無天氣，請於下方輸入英文地名'}</Text>
-                )}
+                <Text style={styles.weatherSetHint}>天氣地名（中文查不到時，輸入英文）</Text>
                 <View style={styles.weatherInputRow}>
                   <TextInput
                     style={styles.weatherInputField}
                     value={weatherInput}
                     onChangeText={setWeatherInput}
-                    placeholder="天氣地名（英文）e.g. Busan"
+                    placeholder="e.g. Busan"
                     placeholderTextColor={Colors.textLight}
                     returnKeyType="search"
                     onSubmitEditing={() => {
@@ -460,11 +447,13 @@ export default function ItineraryScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
         {days.map((day, idx) => {
           const d = dayjs(day.date);
+          const wd = ['日', '一', '二', '三', '四', '五', '六'][d.day()];
           const isSelected = idx === selectedDay;
           return (
             <TouchableOpacity key={day.id} style={[styles.dayBtn, isSelected && styles.dayBtnSelected]} onPress={() => setSelectedDay(idx)}>
               <Text style={[styles.dayBtnLabel, isSelected && styles.dayBtnLabelSelected]}>Day {day.day_number}</Text>
               <Text style={[styles.dayBtnDate, isSelected && styles.dayBtnDateSelected]}>{d.format('M/D')}</Text>
+              <Text style={[styles.dayBtnWeekday, isSelected && styles.dayBtnLabelSelected]}>週{wd}</Text>
             </TouchableOpacity>
           );
         })}
@@ -501,6 +490,19 @@ export default function ItineraryScreen() {
                   {/* 展開：詳細資訊 */}
                   {isOpen && (
                     <View style={styles.itemDetail}>
+                      {(() => {
+                        const w = weatherMap[days[selectedDay]?.date];
+                        if (!w) return null;
+                        const wmo = getWmo(w.code);
+                        return (
+                          <View style={styles.itemWeather}>
+                            <Text style={styles.itemWeatherText}>{wmo.emoji} {wmo.label}</Text>
+                            <Text style={styles.itemWeatherText}>🌡️ {w.max}° / {w.min}°</Text>
+                            <Text style={styles.itemWeatherText}>🌧️ {w.rain}%</Text>
+                            {w.estimated && <Text style={styles.itemWeatherEst}>歷年估值</Text>}
+                          </View>
+                        );
+                      })()}
                       {item.location ? (
                         <TouchableOpacity onPress={() => openInMap(item)}>
                           <Text style={styles.itemLocation}>📍 {item.location} <Text style={styles.mapLink}>在地圖查看 →</Text></Text>
@@ -653,7 +655,7 @@ const styles = StyleSheet.create({
   backBtn: { marginRight: 10, padding: 4 },
   tripName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   tripDate: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  dayScroll: { maxHeight: 72, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  dayScroll: { maxHeight: 88, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
   dayScrollContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   dayBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.background, alignItems: 'center', minWidth: 64 },
   dayBtnSelected: { backgroundColor: Colors.primary },
@@ -661,6 +663,7 @@ const styles = StyleSheet.create({
   dayBtnLabelSelected: { color: '#fff' },
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
+  dayBtnWeekday: { fontSize: 10, color: Colors.textLight, marginTop: 1 },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   dayCardWrap: { marginHorizontal: 12, marginTop: 12, marginBottom: 10 },
   dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.card, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
@@ -669,11 +672,8 @@ const styles = StyleSheet.create({
   dayCardDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   dayChevron: { fontSize: 14, color: Colors.textLight },
   dayDetail: { backgroundColor: Colors.card, borderRadius: 16, marginTop: 8, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  weatherDetailRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
-  weatherDetailItem: { fontSize: 14, color: Colors.text, fontWeight: '500' },
-  weatherDetailEst: { fontSize: 11, color: Colors.accent },
-  weatherDetailNone: { fontSize: 13, color: Colors.textSecondary },
-  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  weatherSetHint: { fontSize: 12, color: Colors.textSecondary },
+  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   weatherSearchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.primary },
   weatherSearchBtnText: { fontSize: 13, color: '#fff', fontWeight: '600' },
@@ -689,6 +689,9 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
   itemChevron: { fontSize: 13, color: Colors.textLight },
   itemDetail: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.background },
+  itemWeather: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 },
+  itemWeatherText: { fontSize: 13, color: Colors.text, fontWeight: '500' },
+  itemWeatherEst: { fontSize: 10, color: Colors.accent },
   itemLocation: { fontSize: 12, color: Colors.textSecondary },
   mapLink: { color: Colors.primary, fontWeight: '500' },
   itemNote: { fontSize: 12, color: Colors.textLight, marginTop: 6 },
