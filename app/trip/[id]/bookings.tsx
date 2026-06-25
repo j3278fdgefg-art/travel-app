@@ -17,6 +17,25 @@ const TABS: Array<{ key: Booking['type']; label: string; emoji: string }> = [
   { key: 'voucher', label: '憑證', emoji: '🎫' },
 ];
 
+const EMPTY_DESC: Record<Booking['type'], string> = {
+  flight: '把航班、訂位代號、座位資訊存進來',
+  hotel: '把住宿名稱、入住/退房日期存進來',
+  car: '把租車公司、取還車地點存進來',
+  voucher: '把景點門票、體驗券、交通票券的兌換碼存進來',
+};
+
+// 由出發/抵達時間（HH:MM）估算飛行時間
+function flightDuration(dep: string, arr: string): string {
+  if (!dep || !arr) return '';
+  const [dh, dm] = dep.split(':').map(Number);
+  const [ah, am] = arr.split(':').map(Number);
+  if ([dh, dm, ah, am].some((n) => Number.isNaN(n))) return '';
+  let mins = (ah * 60 + am) - (dh * 60 + dm);
+  if (mins < 0) mins += 24 * 60;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return `${h ? `${h}h` : ''}${m ? `${m}m` : ''}` || '0m';
+}
+
 const webDateStyle: any = {
   height: 46, backgroundColor: Colors.background, borderRadius: 12,
   paddingLeft: 14, fontSize: 15, color: Colors.text,
@@ -252,7 +271,12 @@ export default function BookingsScreen() {
         {(b.from_location || b.to_location) && (
           <View style={styles.routeRow}>
             <Text style={styles.airportCode}>{b.from_location || '—'}</Text>
-            <Ionicons name="airplane" size={18} color={Colors.primary} style={{ marginHorizontal: 10 }} />
+            <View style={styles.routeMid}>
+              <Ionicons name="airplane" size={18} color={Colors.primary} />
+              {b.type === 'flight' && !!flightDuration(b.departure_time, b.arrival_time) && (
+                <Text style={styles.routeDuration}>{flightDuration(b.departure_time, b.arrival_time)}</Text>
+              )}
+            </View>
             <Text style={styles.airportCode}>{b.to_location || '—'}</Text>
           </View>
         )}
@@ -568,10 +592,14 @@ export default function BookingsScreen() {
 
       <ScrollView contentContainerStyle={styles.list}>
         {filtered.length === 0 ? (
-          <View style={styles.empty}>
+          <TouchableOpacity style={styles.emptyCta} onPress={openModal} activeOpacity={0.8}>
             <Text style={styles.emptyEmoji}>{TABS.find((t) => t.key === activeTab)?.emoji}</Text>
-            <Text style={styles.emptyText}>還沒有{BOOKING_TYPES[activeTab]}資料</Text>
-          </View>
+            <Text style={styles.emptyTitle}>還沒有{BOOKING_TYPES[activeTab]}</Text>
+            <Text style={styles.emptyDesc}>{EMPTY_DESC[activeTab]}</Text>
+            <View style={styles.emptyAddBtn}>
+              <Text style={styles.emptyAddText}>＋ 新增{BOOKING_TYPES[activeTab]}</Text>
+            </View>
+          </TouchableOpacity>
         ) : filtered.map(renderBooking)}
       </ScrollView>
 
@@ -670,7 +698,9 @@ const styles = StyleSheet.create({
   cardMembers: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   refBadge: { backgroundColor: Colors.accent, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   refText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  routeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background, borderRadius: 12, padding: 12, marginBottom: 8 },
+  routeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.background, borderRadius: 12, padding: 12, marginBottom: 8 },
+  routeMid: { alignItems: 'center', marginHorizontal: 10 },
+  routeDuration: { fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
   airportCode: { fontSize: 22, fontWeight: '700', color: Colors.text },
   flightTimeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   timeLabel: { fontSize: 11, color: Colors.textSecondary },
@@ -684,9 +714,12 @@ const styles = StyleSheet.create({
   editBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
   deleteBtnText: { fontSize: 12, color: Colors.danger, fontWeight: '500' },
-  empty: { alignItems: 'center', marginTop: 60 },
+  emptyCta: { alignItems: 'center', marginTop: 40, paddingVertical: 36, paddingHorizontal: 24, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', backgroundColor: 'rgba(255,255,255,0.5)' },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: Colors.textSecondary },
+  emptyTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
+  emptyDesc: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  emptyAddBtn: { marginTop: 18, backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 14 },
+  emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
