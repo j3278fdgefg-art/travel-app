@@ -40,6 +40,7 @@ export default function ChecklistScreen() {
     if (filterMember && i.member_name !== filterMember) return false;
     return true;
   });
+  const doneCount = filtered.filter((i) => i.is_done).length;
 
   const handleAdd = async () => {
     const text = newItem.trim();
@@ -105,7 +106,15 @@ export default function ChecklistScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{TABS.find((t) => t.key === activeTab)?.emoji} {TABS.find((t) => t.key === activeTab)?.label}事項</Text>
+            {filtered.length > 0 && (
+              <Text style={styles.progressLabel}>{doneCount} / {filtered.length} 完成</Text>
+            )}
           </View>
+          {filtered.length > 0 && (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round((doneCount / filtered.length) * 100)}%` }]} />
+            </View>
+          )}
           {filtered.map((item) => (
             <View key={item.id} style={styles.itemRow}>
               <TouchableOpacity onPress={() => toggleChecklistItem(item.id, !item.is_done)}>
@@ -190,8 +199,11 @@ const styles = StyleSheet.create({
   filterTextActive: { color: '#fff', fontWeight: '600' },
   list: { padding: 16, paddingBottom: 100 },
   section: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16 },
-  sectionHeader: { marginBottom: 10 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  progressLabel: { fontSize: 12, color: Colors.textSecondary },
+  progressTrack: { height: 6, backgroundColor: '#EFEAE0', borderRadius: 99, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 99 },
   itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.background, gap: 10 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
   checkboxDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
