@@ -8,6 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 
+const TYPE_META: Record<string, { emoji: string; label: string }> = {
+  transport: { emoji: '🚃', label: '交通' },
+  accommodation: { emoji: '🏨', label: '住宿' },
+  food: { emoji: '🍽️', label: '美食' },
+  attraction: { emoji: '🏞️', label: '景點' },
+  other: { emoji: '📍', label: '地點' },
+};
+const typeMeta = (t?: string) => TYPE_META[t || 'other'] || { emoji: t || '📍', label: '地點' };
+
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
   const { currentTrip, items, fetchTripById, fetchItems, updateTrip } = useTripStore();
@@ -141,12 +150,6 @@ export default function MapScreen() {
         <TouchableOpacity style={styles.navBtn} onPress={handleNavigate}>
           <Ionicons name="navigate" size={18} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.listBtn, showPanel && styles.listBtnActive]}
-          onPress={() => setShowPanel((v) => !v)}
-        >
-          <Ionicons name="list" size={18} color={showPanel ? '#fff' : Colors.primary} />
-        </TouchableOpacity>
       </View>
 
       {/* 導航快捷列 */}
@@ -161,50 +164,66 @@ export default function MapScreen() {
       {/* 可收合面板 */}
       {showPanel && (
         <View style={styles.panel}>
-          {/* 行程地點快速搜尋 */}
-          {locationItems.length > 0 && (
-            <>
-              <Text style={styles.panelTitle}>📍 行程地點</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                <View style={styles.chipRow}>
-                  {locationItems.map((item) => (
+          {/* 行程地點清單 */}
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelTitle}>📍 行程地點</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.panelCount}>共 {locationItems.length} 個</Text>
+          </View>
+          {locationItems.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <View style={styles.chipRow}>
+                {locationItems.map((item, idx) => {
+                  const meta = typeMeta(item.type);
+                  return (
                     <TouchableOpacity
                       key={item.id}
-                      style={styles.locationChip}
+                      style={styles.placeChip}
                       onPress={() => searchLocation(item.location!)}
                     >
-                      <Text style={styles.chipTime}>{item.time || ''}</Text>
-                      <Text style={styles.chipTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.chipLoc} numberOfLines={1}>{item.location}</Text>
+                      <View style={styles.placeChipTop}>
+                        <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
+                        {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
+                      </View>
+                      <Text style={styles.placeName} numberOfLines={1}>{item.title}</Text>
+                      <View style={styles.placeCatRow}>
+                        <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
+                        <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
+                      </View>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </>
-          )}
-          {locationItems.length === 0 && (
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
             <Text style={styles.noLocations}>行程中沒有填寫地點的項目</Text>
           )}
 
-          {/* 檢視清單連結 */}
-          <Text style={[styles.panelTitle, { marginTop: 12 }]}>🔗 Google 檢視清單</Text>
-          <View style={styles.urlRow}>
-            <TextInput
-              style={styles.urlInput}
-              value={listUrl}
-              onChangeText={setListUrl}
-              placeholder="貼上 Google Maps 清單連結..."
-              placeholderTextColor={Colors.textLight}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity style={styles.saveUrlBtn} onPress={handleSaveUrl} disabled={savingUrl}>
+          {/* 分享行程地圖 */}
+          <View style={styles.shareDivider} />
+          <View style={styles.shareRow}>
+            <View style={styles.shareInfo}>
+              <Text style={styles.shareIcon}>🔗</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <TextInput
+                  style={styles.shareInput}
+                  value={listUrl}
+                  onChangeText={setListUrl}
+                  placeholder="貼上 Google 我的地圖連結..."
+                  placeholderTextColor={Colors.textLight}
+                  autoCapitalize="none"
+                />
+                <Text style={styles.shareSub}>分享行程地圖 · Google 我的地圖</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.shareSaveBtn} onPress={handleSaveUrl} disabled={savingUrl}>
               {savingUrl
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="save-outline" size={16} color="#fff" />}
+                : <Ionicons name="save-outline" size={18} color="#fff" />}
             </TouchableOpacity>
             {!!listUrl && (
-              <TouchableOpacity style={styles.openUrlBtn} onPress={handleOpenList}>
-                <Ionicons name="open-outline" size={16} color="#fff" />
+              <TouchableOpacity style={styles.shareOpenBtn} onPress={handleOpenList}>
+                <Ionicons name="share-outline" size={18} color="#fff" />
               </TouchableOpacity>
             )}
           </View>
@@ -224,6 +243,17 @@ export default function MapScreen() {
           allow="geolocation"
         />
       </View>
+
+      {/* 底部：顯示/收合行程地點 */}
+      {locationItems.length > 0 && (
+        <TouchableOpacity style={styles.bottomBar} onPress={() => setShowPanel((v) => !v)} activeOpacity={0.85}>
+          <Text style={styles.bottomBarIcon}>📋</Text>
+          <Text style={styles.bottomBarText}>
+            {showPanel ? '收合清單' : `顯示行程地點（${locationItems.length}）`}
+          </Text>
+          <Text style={styles.bottomBarChevron}>{showPanel ? '▾' : '▴'}</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -237,24 +267,36 @@ const styles = StyleSheet.create({
   searchBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   locateBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   navBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
-  listBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  listBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   navBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8, marginBottom: 6, backgroundColor: Colors.info, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   navBarText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '500' },
   panel: { marginHorizontal: 12, marginBottom: 8, backgroundColor: Colors.card, borderRadius: 16, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  panelTitle: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
-  chipScroll: { maxHeight: 90 },
-  chipRow: { flexDirection: 'row', gap: 8 },
-  locationChip: { backgroundColor: Colors.background, borderRadius: 12, padding: 10, minWidth: 100, maxWidth: 140, borderWidth: 1, borderColor: Colors.border },
-  chipTime: { fontSize: 10, color: Colors.primary, fontWeight: '600', marginBottom: 2 },
-  chipTitle: { fontSize: 12, fontWeight: '600', color: Colors.text },
-  chipLoc: { fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  panelTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  panelCount: { fontSize: 12, color: Colors.textSecondary },
+  chipScroll: { maxHeight: 96 },
+  chipRow: { flexDirection: 'row', gap: 9 },
+  placeChip: { width: 150, backgroundColor: '#F7F5EF', borderRadius: 13, padding: 11, borderWidth: 1.5, borderColor: Colors.border },
+  placeChipTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  placeNum: { width: 20, height: 20, borderRadius: 6, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  placeNumText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  placeTime: { fontSize: 11, fontWeight: '700', color: Colors.primaryDark },
+  placeName: { fontSize: 14, fontWeight: '600', color: Colors.text, marginTop: 8 },
+  placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  placeCat: { fontSize: 11, color: Colors.textSecondary },
   noLocations: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 8 },
-  urlRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  urlInput: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 13, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  saveUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  openUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
-  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6 },
+  shareDivider: { height: 1, backgroundColor: '#EFEAE0', marginVertical: 13 },
+  shareRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  shareInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  shareIcon: { fontSize: 15 },
+  shareInput: { height: 24, padding: 0, fontSize: 13, color: Colors.text },
+  shareSub: { fontSize: 11, color: Colors.textLight, marginTop: 1 },
+  shareSaveBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  shareOpenBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
+  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6, backgroundColor: '#EAE7DF' },
+  bottomBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 12, marginBottom: 10, backgroundColor: Colors.primary, borderRadius: 16, height: 50, shadowColor: Colors.primaryDark, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  bottomBarIcon: { fontSize: 16 },
+  bottomBarText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  bottomBarChevron: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },
