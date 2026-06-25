@@ -4,45 +4,22 @@ import {
   SafeAreaView, Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
-import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
-
-const NAVER_CLIENT_ID: string = (Constants.expoConfig?.extra as any)?.naverMapClientId || '';
-
-// 載入 Naver Maps JS SDK（只載入一次）
-let naverScriptPromise: Promise<void> | null = null;
-function loadNaverMaps(clientId: string): Promise<void> {
-  if (typeof document === 'undefined') return Promise.reject(new Error('no-dom'));
-  if ((window as any).naver?.maps) return Promise.resolve();
-  if (naverScriptPromise) return naverScriptPromise;
-  naverScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => { naverScriptPromise = null; reject(new Error('naver-load-failed')); };
-    document.head.appendChild(script);
-  });
-  return naverScriptPromise;
-}
 
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
   const { currentTrip, items, fetchTripById, fetchItems, updateTrip } = useTripStore();
   const id = params.id || currentTrip?.id || '';
-  const mapElRef = useRef<any>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-  const [sdkReady, setSdkReady] = useState(false);
-  const [sdkError, setSdkError] = useState(false);
+  const iframeRef = useRef<any>(null);
 
   const defaultQuery = (params.q ? decodeURIComponent(params.q as string) : null)
     || currentTrip?.destination || currentTrip?.name || '日本';
 
   const [search, setSearch] = useState(defaultQuery);
   const [query, setQuery] = useState(defaultQuery);
+  const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showPanel, setShowPanel] = useState(false);
@@ -60,50 +37,12 @@ export default function MapScreen() {
   useEffect(() => {
     if (params.q) {
       const q = decodeURIComponent(params.q as string);
-      setSearch(q); setQuery(q);
+      setSearch(q); setQuery(q); setMapKey((k) => k + 1);
     }
   }, [params.q]);
 
-  // 載入 Naver Maps SDK（web + 有金鑰時）
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !NAVER_CLIENT_ID) return;
-    loadNaverMaps(NAVER_CLIENT_ID).then(() => setSdkReady(true)).catch(() => setSdkError(true));
-  }, []);
-
-  // 建立地圖實例
-  useEffect(() => {
-    if (!sdkReady || !mapElRef.current || mapInstanceRef.current) return;
-    const naver = (window as any).naver;
-    const center = new naver.maps.LatLng(35.1796, 129.0756); // 釜山預設中心
-    mapInstanceRef.current = new naver.maps.Map(mapElRef.current, { center, zoom: 13 });
-    markerRef.current = new naver.maps.Marker({ position: center, map: mapInstanceRef.current });
-  }, [sdkReady]);
-
-  // 依 query 更新地圖中心與標記
-  useEffect(() => {
-    if (!sdkReady || !mapInstanceRef.current || !query) return;
-    const naver = (window as any).naver;
-    const setPoint = (lat: number, lng: number) => {
-      const p = new naver.maps.LatLng(lat, lng);
-      mapInstanceRef.current.setCenter(p);
-      mapInstanceRef.current.setZoom(15);
-      markerRef.current?.setPosition(p);
-    };
-    const coordMatch = query.match(/^(-?\d+\.\d+),(-?\d+\.\d+)$/);
-    if (coordMatch) {
-      setPoint(Number(coordMatch[1]), Number(coordMatch[2]));
-      return;
-    }
-    if (!naver.maps.Service) return;
-    naver.maps.Service.geocode({ query }, (status: any, response: any) => {
-      if (status !== naver.maps.Service.Status.OK) return;
-      const addr = response.v2?.addresses?.[0];
-      if (addr) setPoint(Number(addr.y), Number(addr.x));
-    });
-  }, [query, sdkReady]);
-
   const handleSearch = () => {
-    if (search.trim()) setQuery(search.trim());
+    if (search.trim()) { setQuery(search.trim()); setMapKey((k) => k + 1); }
   };
 
   const handleLocate = () => {
@@ -115,6 +54,7 @@ export default function MapScreen() {
         setCurrentCoords({ lat, lng });
         setQuery(`${lat},${lng}`);
         setSearch('目前位置');
+        setMapKey((k) => k + 1);
         setLocating(false);
       },
       () => { alert('定位失敗，請確認已允許位置存取權限'); setLocating(false); },
@@ -151,11 +91,16 @@ export default function MapScreen() {
   };
 
   const searchLocation = (loc: string) => {
-    setSearch(loc); setQuery(loc);
+    setSearch(loc); setQuery(loc); setMapKey((k) => k + 1);
   };
 
   // 行程地點：取有填 location 的行程項目
   const locationItems = items.filter((item) => item.location?.trim());
+
+  const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
+  const mapSrc = isCoord
+    ? `https://maps.google.com/maps?q=${query}&output=embed&hl=zh-TW&z=16`
+    : `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed&hl=zh-TW&z=15`;
 
   if (Platform.OS !== 'web') {
     return (
@@ -268,31 +213,16 @@ export default function MapScreen() {
 
       {/* 地圖 */}
       <View style={styles.mapContainer}>
-        {!NAVER_CLIENT_ID ? (
-          <View style={styles.mapFallback}>
-            <Text style={styles.centerEmoji}>🗺️</Text>
-            <Text style={styles.fallbackTitle}>尚未設定 Naver 地圖金鑰</Text>
-            <Text style={styles.fallbackText}>
-              在 app.json 的 extra.naverMapClientId 填入{'\n'}NAVER Cloud Platform 的 Maps Client ID 即可顯示地圖
-            </Text>
-            <TouchableOpacity style={styles.fallbackBtn} onPress={handleNavigate}>
-              <Ionicons name="open-outline" size={16} color="#fff" />
-              <Text style={styles.fallbackBtnText}>在 Naver 地圖開啟「{search}」</Text>
-            </TouchableOpacity>
-          </View>
-        ) : sdkError ? (
-          <View style={styles.mapFallback}>
-            <Text style={styles.centerEmoji}>⚠️</Text>
-            <Text style={styles.fallbackTitle}>地圖載入失敗</Text>
-            <Text style={styles.fallbackText}>請確認 Naver Maps Client ID 是否正確、網域是否已加入白名單</Text>
-            <TouchableOpacity style={styles.fallbackBtn} onPress={handleNavigate}>
-              <Ionicons name="open-outline" size={16} color="#fff" />
-              <Text style={styles.fallbackBtnText}>在 Naver 地圖開啟「{search}」</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <div ref={mapElRef} style={{ width: '100%', height: '100%' }} />
-        )}
+        <iframe
+          key={mapKey}
+          ref={iframeRef}
+          src={mapSrc}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allow="geolocation"
+        />
       </View>
     </SafeAreaView>
   );
@@ -324,12 +254,7 @@ const styles = StyleSheet.create({
   urlInput: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 13, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   saveUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   openUrlBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
-  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6, backgroundColor: '#EAE7DF' },
-  mapFallback: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  fallbackTitle: { fontSize: 16, fontWeight: '600', color: Colors.text, marginTop: 8 },
-  fallbackText: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 20 },
-  fallbackBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  fallbackBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 6 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },
