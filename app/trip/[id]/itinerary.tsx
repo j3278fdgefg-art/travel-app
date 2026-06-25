@@ -243,12 +243,8 @@ export default function ItineraryScreen() {
   const [locationInput, setLocationInput] = useState('');
   const [urlDetected, setUrlDetected] = useState(false);
   const [weatherMap, setWeatherMap] = useState<Record<string, DayWeather>>({});
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [weatherFailed, setWeatherFailed] = useState(false);
-  const [weatherOverride, setWeatherOverride] = useState('');
-  const [weatherInput, setWeatherInput] = useState('');
-  const [showWeatherInput, setShowWeatherInput] = useState(false);
-  const [dayExpanded, setDayExpanded] = useState(false);
+  const [itemWeatherCache, setItemWeatherCache] = useState<Record<string, DayWeather | null>>({});
+  const fetchingWeatherRef = useRef(new Set<string>());
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
@@ -262,26 +258,56 @@ export default function ItineraryScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (!id) return;
-    const saved = localStorage.getItem(`weather_loc_${id}`) || '';
-    setWeatherOverride(saved);
-    setWeatherInput(saved);
-  }, [id]);
-
-  useEffect(() => {
-    const dest = weatherOverride || currentTrip?.destination || currentTrip?.name;
+    const dest = currentTrip?.destination || currentTrip?.name;
     if (!dest) return;
-    setWeatherLoading(true);
-    setWeatherFailed(false);
     const tripDates = days.map((d) => d.date);
     fetchWeather(dest, tripDates).then((list) => {
       const map: Record<string, DayWeather> = {};
       list.forEach((d) => { map[d.date] = d; });
       setWeatherMap(map);
-      setWeatherFailed(list.length === 0);
-      setWeatherLoading(false);
     });
-  }, [weatherOverride, currentTrip?.destination, currentTrip?.name, days.length]);
+  }, [currentTrip?.destination, currentTrip?.name, days.length]);
+
+  useEffect(() => {
+    if (!expandedItem) return;
+    const item = currentDayItems.find((i) => i.id === expandedItem);
+    if (!item?.location) return;
+    const date = days[selectedDay]?.date;
+    if (!date) return;
+    const cacheKey = `${item.location}__${date}`;
+    if (cacheKey in itemWeatherCache || fetchingWeatherRef.current.has(cacheKey)) return;
+    fetchingWeatherRef.current.add(cacheKey);
+    resolveGeo(item.location).then(async (geo) => {
+      if (!geo) {
+        setItemWeatherCache((prev) => ({ ...prev, [cacheKey]: null }));
+        fetchingWeatherRef.current.delete(cacheKey);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}` +
+          `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunset` +
+          `&timezone=auto&forecast_days=16`
+        );
+        const data = await res.json();
+        const dd = data.daily;
+        const idx = (dd.time as string[]).indexOf(date);
+        const w: DayWeather | null = idx >= 0 ? {
+          date,
+          max: Math.round(dd.temperature_2m_max[idx]),
+          min: Math.round(dd.temperature_2m_min[idx]),
+          rain: dd.precipitation_probability_max[idx] ?? 0,
+          code: dd.weather_code[idx] ?? 0,
+          sunset: dd.sunset?.[idx] ? String(dd.sunset[idx]).slice(11, 16) : '',
+          estimated: false,
+        } : null;
+        setItemWeatherCache((prev) => ({ ...prev, [cacheKey]: w }));
+      } catch {
+        setItemWeatherCache((prev) => ({ ...prev, [cacheKey]: null }));
+      }
+      fetchingWeatherRef.current.delete(cacheKey);
+    });
+  }, [expandedItem, selectedDay]);
 
   const currentDayItems = items
     .filter((i) => days[selectedDay] && i.day_id === days[selectedDay].id)
@@ -396,57 +422,6 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
-      {/* Day 卡：目的地圖示 + Day N + 日期（天氣移到下方行程項目內） */}
-      {currentTrip && days[selectedDay] && (() => {
-        const day = days[selectedDay];
-        const dest = currentTrip.destination || currentTrip.name || '';
-        const dateStr = dayjs(day.date).format('M/D');
-        return (
-          <View style={styles.dayCardWrap}>
-            <TouchableOpacity style={styles.dayCard} activeOpacity={0.8} onPress={() => setDayExpanded((v) => !v)}>
-              <View style={styles.dayCardIcon}>
-                <Text style={{ fontSize: 24 }}>{destFlag(dest)}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.dayCardTitle} numberOfLines={1}>Day {day.day_number}{dest ? ` · ${dest}` : ''}</Text>
-                <Text style={styles.dayCardDate}>{dateStr}</Text>
-              </View>
-              <Text style={styles.dayChevron}>{dayExpanded ? '▾' : '⚙'}</Text>
-            </TouchableOpacity>
-
-            {dayExpanded && (
-              <View style={styles.dayDetail}>
-                <Text style={styles.weatherSetHint}>天氣地名（中文查不到時，輸入英文）</Text>
-                <View style={styles.weatherInputRow}>
-                  <TextInput
-                    style={styles.weatherInputField}
-                    value={weatherInput}
-                    onChangeText={setWeatherInput}
-                    placeholder="e.g. Busan"
-                    placeholderTextColor={Colors.textLight}
-                    returnKeyType="search"
-                    onSubmitEditing={() => {
-                      const v = weatherInput.trim();
-                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                      else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.weatherSearchBtn}
-                    onPress={() => {
-                      const v = weatherInput.trim();
-                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                      else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
-                    }}
-                  >
-                    <Text style={styles.weatherSearchBtnText}>更新</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        );
-      })()}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
         {days.map((day, idx) => {
@@ -495,7 +470,11 @@ export default function ItineraryScreen() {
                   {isOpen && (
                     <View style={styles.itemDetail}>
                       {(() => {
-                        const w = weatherMap[days[selectedDay]?.date];
+                        const date = days[selectedDay]?.date ?? '';
+                        const cacheKey = `${item.location}__${date}`;
+                        const w = item.location
+                          ? (itemWeatherCache[cacheKey] ?? weatherMap[date])
+                          : weatherMap[date];
                         if (!w) return null;
                         const wmo = getWmo(w.code);
                         return (
@@ -669,18 +648,6 @@ const styles = StyleSheet.create({
   dayBtnDateSelected: { color: '#fff' },
   dayBtnWeekday: { fontSize: 10, color: Colors.textLight, marginTop: 1 },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  dayCardWrap: { marginHorizontal: 12, marginTop: 12, marginBottom: 10 },
-  dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.card, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  dayCardIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(124,154,107,0.14)', justifyContent: 'center', alignItems: 'center' },
-  dayCardTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
-  dayCardDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  dayChevron: { fontSize: 14, color: Colors.textLight },
-  dayDetail: { backgroundColor: Colors.card, borderRadius: 16, marginTop: 8, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  weatherSetHint: { fontSize: 12, color: Colors.textSecondary },
-  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  weatherSearchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.primary },
-  weatherSearchBtnText: { fontSize: 13, color: '#fff', fontWeight: '600' },
   timelineRow: { flexDirection: 'row', marginBottom: 8 },
   timeCol: { width: 50, paddingTop: 10 },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
