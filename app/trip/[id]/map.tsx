@@ -215,7 +215,9 @@ export default function MapScreen() {
       }).filter(x => x.coords !== null) as Array<{ item: ItineraryItem, coords: { latitude: number, longitude: number } }>;
 
       let map = mapRef.current;
-      if (!map) {
+      // 若 div 是全新空白（剛從 Google 切回），舊 map 已綁定消失的 DOM，需重建
+      if (!map || !container.firstChild) {
+        mapRef.current = null;
         let centerLat = 37.5665; // 首爾
         let centerLng = 126.9780;
         
