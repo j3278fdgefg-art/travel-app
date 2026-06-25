@@ -245,6 +245,8 @@ export default function ItineraryScreen() {
   const [weatherOverride, setWeatherOverride] = useState('');
   const [weatherInput, setWeatherInput] = useState('');
   const [showWeatherInput, setShowWeatherInput] = useState(false);
+  const [dayExpanded, setDayExpanded] = useState(false);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -390,7 +392,7 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
-      {/* Day 卡 + 右側小天氣（依設計：行程 Day 詳情 - 版本A） */}
+      {/* Day 卡（可收合）：點開才顯示天氣 */}
       {currentTrip && days[selectedDay] && (() => {
         const day = days[selectedDay];
         const w = weatherMap[day.date];
@@ -401,7 +403,7 @@ export default function ItineraryScreen() {
         const wmo = w ? getWmo(w.code) : null;
         return (
           <View style={styles.dayCardWrap}>
-            <View style={styles.dayCard}>
+            <TouchableOpacity style={styles.dayCard} activeOpacity={0.8} onPress={() => setDayExpanded((v) => !v)}>
               <View style={styles.dayCardIcon}>
                 <Text style={{ fontSize: 24 }}>{destFlag(dest)}</Text>
               </View>
@@ -409,52 +411,46 @@ export default function ItineraryScreen() {
                 <Text style={styles.dayCardTitle} numberOfLines={1}>Day {day.day_number}{dest ? ` · ${dest}` : ''}</Text>
                 <Text style={styles.dayCardDate}>{dateStr}</Text>
               </View>
-              <TouchableOpacity style={styles.dayWeather} activeOpacity={0.7} onPress={() => setShowWeatherInput((v) => !v)}>
+              <Text style={styles.dayChevron}>{dayExpanded ? '▾' : '▸'}</Text>
+            </TouchableOpacity>
+
+            {dayExpanded && (
+              <View style={styles.dayDetail}>
                 {w && wmo ? (
-                  <>
-                    <View style={styles.dayWeatherTop}>
-                      <Text style={{ fontSize: 18 }}>{wmo.emoji}</Text>
-                      <Text style={styles.dayWeatherTemp}>{w.max}°</Text>
-                    </View>
-                    <Text style={styles.dayWeatherSub}>{wmo.label} · {w.min}°</Text>
-                    {w.estimated && <Text style={styles.dayWeatherEst}>歷年同期估值</Text>}
-                  </>
-                ) : (
-                  <View style={styles.dayWeatherTop}>
-                    <Text style={{ fontSize: 14 }}>{weatherLoading ? '🌡️' : '🔍'}</Text>
-                    <Text style={styles.dayWeatherSet}>{weatherLoading ? '載入中' : '設定地名'}</Text>
+                  <View style={styles.weatherDetailRow}>
+                    <Text style={styles.weatherDetailItem}>{wmo.emoji} {wmo.label}</Text>
+                    <Text style={styles.weatherDetailItem}>🌡️ {w.max}° / {w.min}°</Text>
+                    <Text style={styles.weatherDetailItem}>🌧️ {w.rain}%</Text>
+                    {w.estimated && <Text style={styles.weatherDetailEst}>歷年同期估值</Text>}
                   </View>
+                ) : (
+                  <Text style={styles.weatherDetailNone}>{weatherLoading ? '天氣載入中…' : '查無天氣，請於下方輸入英文地名'}</Text>
                 )}
-              </TouchableOpacity>
-            </View>
-            {showWeatherInput && (
-              <View style={styles.weatherInputRow}>
-                <TextInput
-                  style={styles.weatherInputField}
-                  value={weatherInput}
-                  onChangeText={setWeatherInput}
-                  placeholder="輸入英文地名 e.g. Busan"
-                  placeholderTextColor={Colors.textLight}
-                  autoFocus
-                  returnKeyType="search"
-                  onSubmitEditing={() => {
-                    const v = weatherInput.trim();
-                    if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                    else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
-                    setShowWeatherInput(false);
-                  }}
-                />
-                <TouchableOpacity
-                  style={styles.weatherSearchBtn}
-                  onPress={() => {
-                    const v = weatherInput.trim();
-                    if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                    else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
-                    setShowWeatherInput(false);
-                  }}
-                >
-                  <Text style={styles.weatherSearchBtnText}>搜尋</Text>
-                </TouchableOpacity>
+                <View style={styles.weatherInputRow}>
+                  <TextInput
+                    style={styles.weatherInputField}
+                    value={weatherInput}
+                    onChangeText={setWeatherInput}
+                    placeholder="天氣地名（英文）e.g. Busan"
+                    placeholderTextColor={Colors.textLight}
+                    returnKeyType="search"
+                    onSubmitEditing={() => {
+                      const v = weatherInput.trim();
+                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                      else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.weatherSearchBtn}
+                    onPress={() => {
+                      const v = weatherInput.trim();
+                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
+                      else { localStorage.removeItem(`weather_loc_${id}`); setWeatherOverride(''); }
+                    }}
+                  >
+                    <Text style={styles.weatherSearchBtnText}>更新</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -483,39 +479,50 @@ export default function ItineraryScreen() {
             <Text style={styles.emptySubtext}>點擊右下角 + 新增</Text>
           </View>
         ) : (
-          currentDayItems.map((item, idx) => (
-            <View key={item.id} style={styles.timelineRow}>
-              <View style={styles.timeCol}>
-                <Text style={styles.timeText}>{item.time}</Text>
-              </View>
-              <View style={styles.dotCol}>
-                <View style={[styles.dot, { backgroundColor: emojiColor(typeEmoji(item.type)) }]} />
-                {idx < currentDayItems.length - 1 && <View style={styles.line} />}
-              </View>
-              <View style={styles.itemCard}>
-                <View style={styles.itemRow}>
-                  <Text style={styles.itemEmoji}>{typeEmoji(item.type)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    {item.location ? (
-                      <TouchableOpacity onPress={() => openInMap(item)}>
-                        <Text style={styles.itemLocation}>📍 {item.location} <Text style={styles.mapLink}>在地圖查看 →</Text></Text>
-                      </TouchableOpacity>
-                    ) : null}
-                    {item.note ? <Text style={styles.itemNote}>{item.note}</Text> : null}
-                  </View>
-                  <View style={styles.itemBtns}>
-                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                      <Text style={styles.itemBtnEmoji}>✏️</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                      <Text style={styles.itemBtnEmoji}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
+          currentDayItems.map((item, idx) => {
+            const isOpen = expandedItem === item.id;
+            return (
+              <View key={item.id} style={styles.timelineRow}>
+                <View style={styles.timeCol}>
+                  <Text style={styles.timeText}>{item.time}</Text>
+                </View>
+                <View style={styles.dotCol}>
+                  <View style={[styles.dot, { backgroundColor: emojiColor(typeEmoji(item.type)) }]} />
+                  {idx < currentDayItems.length - 1 && <View style={styles.line} />}
+                </View>
+                <View style={styles.itemCard}>
+                  {/* 收合狀態：只有圖示 + 名稱 */}
+                  <TouchableOpacity style={styles.itemRow} activeOpacity={0.7} onPress={() => setExpandedItem(isOpen ? null : item.id)}>
+                    <Text style={styles.itemEmoji}>{typeEmoji(item.type)}</Text>
+                    <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={isOpen ? undefined : 1}>{item.title}</Text>
+                    <Text style={styles.itemChevron}>{isOpen ? '▾' : '▸'}</Text>
+                  </TouchableOpacity>
+
+                  {/* 展開：詳細資訊 */}
+                  {isOpen && (
+                    <View style={styles.itemDetail}>
+                      {item.location ? (
+                        <TouchableOpacity onPress={() => openInMap(item)}>
+                          <Text style={styles.itemLocation}>📍 {item.location} <Text style={styles.mapLink}>在地圖查看 →</Text></Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {item.note ? <Text style={styles.itemNote}>{item.note}</Text> : null}
+                      <View style={styles.itemBtns}>
+                        <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
+                          <Text style={styles.itemBtnEmoji}>✏️</Text>
+                          <Text style={styles.itemBtnLabel}>編輯</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                          <Text style={styles.itemBtnEmoji}>🗑️</Text>
+                          <Text style={[styles.itemBtnLabel, { color: Colors.danger }]}>刪除</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -660,13 +667,13 @@ const styles = StyleSheet.create({
   dayCardIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(124,154,107,0.14)', justifyContent: 'center', alignItems: 'center' },
   dayCardTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
   dayCardDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  dayWeather: { alignItems: 'flex-end', minWidth: 60 },
-  dayWeatherTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dayWeatherTemp: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  dayWeatherSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
-  dayWeatherEst: { fontSize: 9, color: Colors.accent, marginTop: 1 },
-  dayWeatherSet: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  dayChevron: { fontSize: 14, color: Colors.textLight },
+  dayDetail: { backgroundColor: Colors.card, borderRadius: 16, marginTop: 8, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  weatherDetailRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 14 },
+  weatherDetailItem: { fontSize: 14, color: Colors.text, fontWeight: '500' },
+  weatherDetailEst: { fontSize: 11, color: Colors.accent },
+  weatherDetailNone: { fontSize: 13, color: Colors.textSecondary },
+  weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   weatherSearchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.primary },
   weatherSearchBtnText: { fontSize: 13, color: '#fff', fontWeight: '600' },
@@ -677,16 +684,19 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6, marginTop: 10 },
   line: { width: 2, flex: 1, backgroundColor: Colors.border, marginTop: 4 },
   itemCard: { flex: 1, backgroundColor: Colors.card, borderRadius: 14, padding: 14, marginBottom: 4, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  itemEmoji: { fontSize: 20, marginTop: 2 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  itemEmoji: { fontSize: 20 },
   itemTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  itemLocation: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  itemChevron: { fontSize: 13, color: Colors.textLight },
+  itemDetail: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.background },
+  itemLocation: { fontSize: 12, color: Colors.textSecondary },
   mapLink: { color: Colors.primary, fontWeight: '500' },
-  itemNote: { fontSize: 12, color: Colors.textLight, marginTop: 4 },
-  itemBtns: { flexDirection: 'row', gap: 6 },
-  editBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
-  deleteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
+  itemNote: { fontSize: 12, color: Colors.textLight, marginTop: 6 },
+  itemBtns: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'flex-end' },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
   itemBtnEmoji: { fontSize: 13 },
+  itemBtnLabel: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
   emptyDay: { alignItems: 'center', marginTop: 80 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },
