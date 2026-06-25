@@ -165,6 +165,26 @@ function toDbType(emoji: string): string {
 }
 const PALETTE = ['#5A8AAD', '#9B6BBF', '#D4A853', '#5AAD6B', '#AD5A5A', '#5A9E9E', '#AD7B5A'];
 
+// 依目的地推測國旗（行程 Day 卡左側圖示，取代日曆 emoji）
+function destFlag(dest: string): string {
+  const map: Array<[RegExp, string]> = [
+    [/韓國|南韓|首爾|釜山|濟州|仁川|大邱|慶州/, '🇰🇷'],
+    [/日本|東京|大阪|京都|岡山|北海道|沖繩|那霸|福岡|名古屋|札幌|神戶|橫濱|廣島/, '🇯🇵'],
+    [/台灣|臺灣|台北|臺北|高雄|台中|台南/, '🇹🇼'],
+    [/泰國|曼谷|清邁|普吉/, '🇹🇭'],
+    [/越南|峴港|河內|胡志明/, '🇻🇳'],
+    [/新加坡/, '🇸🇬'],
+    [/香港/, '🇭🇰'],
+    [/澳門/, '🇲🇴'],
+    [/中國|上海|北京|成都/, '🇨🇳'],
+    [/美國/, '🇺🇸'],
+    [/英國|倫敦/, '🇬🇧'],
+    [/法國|巴黎/, '🇫🇷'],
+  ];
+  for (const [re, flag] of map) if (re.test(dest)) return flag;
+  return '🧳';
+}
+
 function typeEmoji(t: string) { return LEGACY_EMOJI[t] || t; }
 function emojiColor(e: string) {
   let h = 0;
@@ -382,7 +402,7 @@ export default function ItineraryScreen() {
           <View style={styles.dayCardWrap}>
             <View style={styles.dayCard}>
               <View style={styles.dayCardIcon}>
-                <Text style={{ fontSize: 22 }}>📅</Text>
+                <Text style={{ fontSize: 24 }}>{destFlag(dest)}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.dayCardTitle} numberOfLines={1}>Day {day.day_number}{dest ? ` · ${dest}` : ''}</Text>
