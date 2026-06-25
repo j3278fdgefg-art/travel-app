@@ -46,6 +46,7 @@ interface DayWeather {
   rain: number;
   code: number;
   sunset: string;
+  estimated: boolean;
 }
 
 function getClothing(max: number, min: number): string {
@@ -61,7 +62,7 @@ function getClothing(max: number, min: number): string {
 async function geocode(name: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const res = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=3`
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1`
     );
     const data = await res.json();
     if (data.results?.length) return data.results[0];
@@ -69,32 +70,84 @@ async function geocode(name: string): Promise<{ latitude: number; longitude: num
   return null;
 }
 
-async function fetchWeather(destination: string): Promise<DayWeather[]> {
-  try {
-    // 先嘗試完整目的地，失敗的話取第一個詞再試一次
-    let geo = await geocode(destination);
-    if (!geo) {
-      const firstWord = destination.split(/[,，、・\s\/]/)[0].trim();
-      if (firstWord && firstWord !== destination) geo = await geocode(firstWord);
-    }
-    if (!geo) return [];
+// 中日韓常見地名 → 英文（open-meteo 地理編碼只認得英文/羅馬拼音）
+const CITY_DICT: Record<string, string> = {
+  釜山: 'Busan', 首爾: 'Seoul', 濟州: 'Jeju', 仁川: 'Incheon', 大邱: 'Daegu', 慶州: 'Gyeongju',
+  東京: 'Tokyo', 大阪: 'Osaka', 京都: 'Kyoto', 岡山: 'Okayama', 廣島: 'Hiroshima', 福岡: 'Fukuoka',
+  名古屋: 'Nagoya', 札幌: 'Sapporo', 沖繩: 'Okinawa', 那霸: 'Naha', 神戶: 'Kobe', 橫濱: 'Yokohama',
+  曼谷: 'Bangkok', 清邁: 'Chiang Mai', 峴港: 'Da Nang', 河內: 'Hanoi', 胡志明: 'Ho Chi Minh',
+  新加坡: 'Singapore', 香港: 'Hong Kong', 澳門: 'Macau', 台北: 'Taipei', 臺北: 'Taipei', 高雄: 'Kaohsiung',
+};
 
+// 解析目的地 → 經緯度：先查字典、去掉國名前綴，再交給 open-meteo
+async function resolveGeo(destination: string): Promise<{ latitude: number; longitude: number } | null> {
+  const stripped = destination.replace(/^(韓國|南韓|北韓|日本|台灣|臺灣|中國|泰國|越南|美國|英國|法國)/, '').trim();
+  const candidates: string[] = [];
+  for (const key of [stripped, destination]) if (CITY_DICT[key]) candidates.push(CITY_DICT[key]);
+  candidates.push(stripped, destination, destination.split(/[,，、・\s/]/)[0].trim());
+  for (const c of candidates) {
+    if (!c) continue;
+    const g = await geocode(c);
+    if (g) return g;
+  }
+  return null;
+}
+
+const shiftYear = (date: string, delta: number) => dayjs(date).add(delta, 'year').format('YYYY-MM-DD');
+
+async function fetchWeather(destination: string, tripDates: string[] = []): Promise<DayWeather[]> {
+  try {
+    const geo = await resolveGeo(destination);
+    if (!geo) return [];
     const { latitude, longitude } = geo;
+
+    // 16 天內：真實預報
     const wRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunset` +
       `&timezone=auto&forecast_days=16`
     );
     const wData = await wRes.json();
-    const { time, temperature_2m_max, temperature_2m_min, precipitation_probability_max, weather_code, sunset } = wData.daily;
-    return time.map((date: string, i: number) => ({
+    const dd = wData.daily;
+    const out: DayWeather[] = dd.time.map((date: string, i: number) => ({
       date,
-      max: Math.round(temperature_2m_max[i]),
-      min: Math.round(temperature_2m_min[i]),
-      rain: precipitation_probability_max[i] ?? 0,
-      code: weather_code[i] ?? 0,
-      sunset: sunset?.[i] ? sunset[i].slice(11, 16) : '',
+      max: Math.round(dd.temperature_2m_max[i]),
+      min: Math.round(dd.temperature_2m_min[i]),
+      rain: dd.precipitation_probability_max[i] ?? 0,
+      code: dd.weather_code[i] ?? 0,
+      sunset: dd.sunset?.[i] ? dd.sunset[i].slice(11, 16) : '',
+      estimated: false,
     }));
+
+    // 超出預報範圍的行程日期：抓「去年同期」歷史天氣當預估
+    const have = new Set(out.map((d) => d.date));
+    const missing = tripDates.filter((d) => d && !have.has(d)).sort();
+    if (missing.length) {
+      try {
+        const aRes = await fetch(
+          `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}` +
+          `&start_date=${shiftYear(missing[0], -1)}&end_date=${shiftYear(missing[missing.length - 1], -1)}` +
+          `&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto`
+        );
+        const aData = await aRes.json();
+        const ad = aData.daily;
+        ad?.time?.forEach((t: string, i: number) => {
+          const tripDate = shiftYear(t, 1);
+          if (missing.includes(tripDate)) {
+            out.push({
+              date: tripDate,
+              max: Math.round(ad.temperature_2m_max[i]),
+              min: Math.round(ad.temperature_2m_min[i]),
+              rain: 0,
+              code: ad.weather_code[i] ?? 0,
+              sunset: '',
+              estimated: true,
+            });
+          }
+        });
+      } catch {}
+    }
+    return out;
   } catch {
     return [];
   }
@@ -194,14 +247,15 @@ export default function ItineraryScreen() {
     if (!dest) return;
     setWeatherLoading(true);
     setWeatherFailed(false);
-    fetchWeather(dest).then((list) => {
+    const tripDates = days.map((d) => d.date);
+    fetchWeather(dest, tripDates).then((list) => {
       const map: Record<string, DayWeather> = {};
       list.forEach((d) => { map[d.date] = d; });
       setWeatherMap(map);
       setWeatherFailed(list.length === 0);
       setWeatherLoading(false);
     });
-  }, [weatherOverride, currentTrip?.destination, currentTrip?.name]);
+  }, [weatherOverride, currentTrip?.destination, currentTrip?.name, days.length]);
 
   const currentDayItems = items
     .filter((i) => days[selectedDay] && i.day_id === days[selectedDay].id)
@@ -342,6 +396,7 @@ export default function ItineraryScreen() {
                       <Text style={styles.dayWeatherTemp}>{w.max}°</Text>
                     </View>
                     <Text style={styles.dayWeatherSub}>{wmo.label} · {w.min}°</Text>
+                    {w.estimated && <Text style={styles.dayWeatherEst}>歷年同期估值</Text>}
                   </>
                 ) : (
                   <View style={styles.dayWeatherTop}>
@@ -588,6 +643,7 @@ const styles = StyleSheet.create({
   dayWeatherTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dayWeatherTemp: { fontSize: 17, fontWeight: '700', color: Colors.text },
   dayWeatherSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  dayWeatherEst: { fontSize: 9, color: Colors.accent, marginTop: 1 },
   dayWeatherSet: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
