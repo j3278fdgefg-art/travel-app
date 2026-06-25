@@ -298,7 +298,7 @@ export default function ItineraryScreen() {
 
   const openInMap = (item: ItineraryItem) => {
     const q = item.location || item.title;
-    router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}`);
+    router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
 
   return (

@@ -7,6 +7,7 @@ export interface Trip {
   cover_emoji: string;
   owner_id: string;
   created_at: string;
+  map_list_url?: string;
 }
 
 export interface TripMember {

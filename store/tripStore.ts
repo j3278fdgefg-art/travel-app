@@ -34,7 +34,7 @@ interface TripStore {
   fetchBookings: (tripId: string) => Promise<void>;
   fetchExpenses: (tripId: string) => Promise<void>;
   fetchChecklist: (tripId: string) => Promise<void>;
-  addExpense: (expense: Partial<Expense>) => Promise<void>;
+  addExpense: (expense: Partial<Expense>) => Promise<boolean>;
   addChecklistItem: (item: Partial<ChecklistItem>) => Promise<void>;
   toggleChecklistItem: (id: string, done: boolean) => Promise<void>;
   addItineraryItem: (item: Partial<ItineraryItem>) => Promise<void>;

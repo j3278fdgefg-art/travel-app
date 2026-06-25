@@ -557,14 +557,6 @@ export default function BookingsScreen() {
         <Text style={styles.headerTitle}>預訂管理</Text>
       </View>
 
-      <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>機票總金額 (TWD)</Text>
-        <Text style={styles.totalAmount}>
-          {bookings.filter((b) => b.type === 'flight').reduce((s, b) => s + b.amount, 0).toLocaleString()}
-        </Text>
-        <Ionicons name="airplane" size={48} color="rgba(255,255,255,0.2)" style={styles.totalIcon} />
-      </View>
-
       <View style={styles.tabs}>
         {TABS.map((t) => (
           <TouchableOpacity key={t.key} style={[styles.tab, activeTab === t.key && styles.tabActive]} onPress={() => setActiveTab(t.key)}>
@@ -660,13 +652,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingVertical: 16 },
   headerTitle: { fontSize: 24, fontWeight: '700', color: Colors.text },
-  totalCard: {
-    marginHorizontal: 20, borderRadius: 16, backgroundColor: Colors.primaryDark,
-    padding: 20, marginBottom: 16, overflow: 'hidden',
-  },
-  totalLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginBottom: 4 },
-  totalAmount: { color: '#fff', fontSize: 36, fontWeight: '700' },
-  totalIcon: { position: 'absolute', right: 16, bottom: 8 },
   tabs: {
     flexDirection: 'row', backgroundColor: Colors.card,
     paddingHorizontal: 16, paddingVertical: 8, gap: 8,
