@@ -54,6 +54,10 @@ export default function MapScreen() {
   const [locating, setLocating] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
 
+  const [kakaoLoaded, setKakaoLoaded] = useState(false);
+  const [kakaoError, setKakaoError] = useState<string | null>(null);
+  const [mapSource, setMapSource] = useState<'kakao' | 'google'>('google');
+
   // 行程地點：取有填 location 的行程項目
   const locationItems = items.filter((item) => item.location?.trim());
 
@@ -68,7 +72,15 @@ export default function MapScreen() {
     }
   }, [params.q]);
 
-  const [kakaoLoaded, setKakaoLoaded] = useState(false);
+  // 根據行程目的地自動識別並設定地圖來源
+  useEffect(() => {
+    if (currentTrip) {
+      const dest = currentTrip.destination || '';
+      const isKoreaDest = /korea|韓國|首爾|釜山|濟州|seoul|busan|jeju|仁川|incheon/i.test(dest);
+      setMapSource(kakaoAppKey && isKoreaDest ? 'kakao' : 'google');
+    }
+  }, [currentTrip?.id, kakaoAppKey]);
+
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
@@ -80,17 +92,41 @@ export default function MapScreen() {
       return;
     }
 
+    let timeoutId: any;
+    setKakaoError(null);
+
     const initializeKakao = () => {
       const kakao = (window as any).kakao;
       if (kakao && kakao.maps) {
-        kakao.maps.load(() => {
-          setKakaoLoaded(true);
-        });
+        try {
+          kakao.maps.load(() => {
+            clearTimeout(timeoutId);
+            setKakaoLoaded(true);
+            setKakaoError(null);
+          });
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          setKakaoError(err.message || 'Kakao Maps 載入失敗');
+          setMapSource('google');
+        }
+      } else {
+        clearTimeout(timeoutId);
+        setKakaoError('Kakao Maps 物件未定義');
+        setMapSource('google');
       }
     };
 
+    // 設定 5 秒逾時保護
+    timeoutId = setTimeout(() => {
+      if (!(window as any).kakao || !(window as any).kakao.maps || !(window as any).kakao.maps.Map) {
+        setKakaoError('Kakao 地圖載入逾時，已自動切換回 Google 地圖');
+        setMapSource('google');
+      }
+    }, 5000);
+
     // 1. 如果 Map 建構子已經存在，代表完全載入成功
     if ((window as any).kakao && (window as any).kakao.maps && (window as any).kakao.maps.Map) {
+      clearTimeout(timeoutId);
       setKakaoLoaded(true);
       return;
     }
@@ -102,14 +138,22 @@ export default function MapScreen() {
     }
 
     // 3. 如果 script 已經存在，等待其 onload 觸發
-    const existingScript = document.getElementById('kakao-maps-sdk');
+    const existingScript = document.getElementById('kakao-maps-sdk') as HTMLScriptElement;
     if (existingScript) {
       const handleScriptLoad = () => {
         initializeKakao();
       };
+      const handleScriptError = () => {
+        clearTimeout(timeoutId);
+        setKakaoError('Kakao SDK 載入錯誤 (可能是金鑰無效或被封鎖)');
+        setMapSource('google');
+      };
       existingScript.addEventListener('load', handleScriptLoad);
+      existingScript.addEventListener('error', handleScriptError);
       return () => {
         existingScript.removeEventListener('load', handleScriptLoad);
+        existingScript.removeEventListener('error', handleScriptError);
+        clearTimeout(timeoutId);
       };
     }
 
@@ -123,12 +167,22 @@ export default function MapScreen() {
       initializeKakao();
     };
 
+    script.onerror = () => {
+      clearTimeout(timeoutId);
+      setKakaoError('Kakao SDK 載入失敗 (可能是金鑰無效或網域未授權)');
+      setMapSource('google');
+    };
+
     document.head.appendChild(script);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [kakaoAppKey]);
 
   // 當地圖載入完成且有行程地點時，初始化 Kakao 地圖並畫標記、路徑
   useEffect(() => {
-    if (!kakaoLoaded) return;
+    if (!kakaoLoaded || mapSource !== 'kakao') return;
 
     const kakao = (window as any).kakao;
     const container = document.getElementById('kakao-map');
@@ -224,11 +278,11 @@ export default function MapScreen() {
       polyline.setMap(map);
       polylineRef.current = polyline;
     }
-  }, [kakaoLoaded, items, currentTrip]);
+  }, [kakaoLoaded, items, currentTrip, mapSource]);
 
   // 監聽外部傳入的 query (點擊景點卡片)，平滑移動定位
   useEffect(() => {
-    if (!mapRef.current || !kakaoLoaded) return;
+    if (!mapRef.current || !kakaoLoaded || mapSource !== 'kakao') return;
     const kakao = (window as any).kakao;
     const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
 
@@ -247,7 +301,7 @@ export default function MapScreen() {
         }
       });
     }
-  }, [query, kakaoLoaded]);
+  }, [query, kakaoLoaded, mapSource]);
 
   const handleLocate = () => {
     if (!navigator.geolocation) return alert('瀏覽器不支援定位');
@@ -346,7 +400,7 @@ export default function MapScreen() {
     : `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed&hl=zh-TW&z=15`;
 
   const renderMap = () => {
-    if (kakaoAppKey) {
+    if (mapSource === 'kakao') {
       if (!kakaoLoaded) {
         return (
           <View style={styles.center}>
@@ -355,7 +409,20 @@ export default function MapScreen() {
           </View>
         );
       }
-      return <div id="kakao-map" style={{ width: '100%', height: '100%' }} />;
+      return (
+        <div
+          id="kakao-map"
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: '100%',
+            height: '100%',
+          }}
+        />
+      );
     }
 
     return (
@@ -363,7 +430,16 @@ export default function MapScreen() {
         key={mapKey}
         ref={iframeRef}
         src={mapSrc}
-        style={{ width: '100%', height: '100%', border: 'none' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        }}
         allowFullScreen
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
@@ -386,6 +462,47 @@ export default function MapScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ height: 12 }} />
+
+      {/* 地圖來源切換頁籤 (若有設定金鑰才顯示) */}
+      {!!kakaoAppKey && (
+        <View style={styles.mapSourceRow}>
+          <TouchableOpacity
+            style={[styles.sourceTab, mapSource === 'google' && styles.sourceTabActive]}
+            onPress={() => setMapSource('google')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.sourceTabText, mapSource === 'google' && styles.sourceTabTextActive]}>
+              🗺️ Google 地圖
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sourceTab, mapSource === 'kakao' && styles.sourceTabActive]}
+            onPress={() => {
+              if (kakaoError) {
+                alert(`Kakao 地圖載入失敗：${kakaoError}`);
+                return;
+              }
+              setMapSource('kakao');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.sourceTabText, mapSource === 'kakao' && styles.sourceTabTextActive]}>
+              🇰🇷 Kakao 韓國地圖
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Kakao 載入失敗/警告提示 */}
+      {!!kakaoError && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>⚠️ Kakao 地圖載入失敗 (已自動切換 Google 地圖備用)</Text>
+          <Text style={styles.warningDetail}>{kakaoError}</Text>
+          <Text style={styles.warningTip}>
+            提示：使用 Kakao 地圖需於 Kakao Developers 註冊您的 Web 平台網域 (例如：https://travel-app-seven-chi.vercel.app)。
+          </Text>
+        </View>
+      )}
 
       {/* 上排：顯示/隱藏行程地點 + 定位 */}
       <View style={styles.topRow}>
@@ -419,7 +536,7 @@ export default function MapScreen() {
                 {locationItems.map((item, idx) => {
                   const meta = typeMeta(item.type);
                   return (
-                    <View key={item.id} style={styles.placeChip}>
+                     <View key={item.id} style={styles.placeChip}>
                       <TouchableOpacity activeOpacity={0.7} onPress={() => showOnMap(item)}>
                         <View style={styles.placeChipTop}>
                           <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
@@ -490,10 +607,19 @@ const styles = StyleSheet.create({
   noLocations: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 8 },
   placeNavBtn: { marginTop: 9, backgroundColor: Colors.primary, borderRadius: 9, paddingVertical: 7, alignItems: 'center' },
   placeNavText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 10, backgroundColor: '#EAE7DF' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 10, backgroundColor: '#EAE7DF', position: 'relative', minHeight: 350 },
+  center: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EAE7DF' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },
   kakaoTip: { marginHorizontal: 12, marginBottom: 10, padding: 10, backgroundColor: '#FCF9F2', borderRadius: 10, borderWidth: 1, borderColor: Colors.border },
   kakaoTipText: { fontSize: 11, color: Colors.accent, fontWeight: '500', textAlign: 'center', lineHeight: 16 },
+  mapSourceRow: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 8, backgroundColor: '#EAE7DF', borderRadius: 12, padding: 3 },
+  sourceTab: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  sourceTabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  sourceTabText: { fontSize: 13, fontWeight: '600', color: '#8A857A' },
+  sourceTabTextActive: { color: Colors.primaryDark },
+  warningBanner: { marginHorizontal: 12, marginBottom: 10, padding: 12, backgroundColor: '#FFF8E6', borderRadius: 12, borderWidth: 1, borderColor: '#FFE0B2' },
+  warningText: { fontSize: 12, fontWeight: '700', color: '#E65100' },
+  warningDetail: { fontSize: 11, color: '#D84315', marginTop: 4, fontFamily: 'monospace' },
+  warningTip: { fontSize: 11, color: '#F57C00', marginTop: 6, lineHeight: 15 },
 });
