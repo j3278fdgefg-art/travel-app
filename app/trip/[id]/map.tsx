@@ -80,33 +80,47 @@ export default function MapScreen() {
       return;
     }
 
-    // 檢查 window.kakao 是否已存在
-    if ((window as any).kakao && (window as any).kakao.maps) {
+    const initializeKakao = () => {
+      const kakao = (window as any).kakao;
+      if (kakao && kakao.maps) {
+        kakao.maps.load(() => {
+          setKakaoLoaded(true);
+        });
+      }
+    };
+
+    // 1. 如果 Map 建構子已經存在，代表完全載入成功
+    if ((window as any).kakao && (window as any).kakao.maps && (window as any).kakao.maps.Map) {
       setKakaoLoaded(true);
       return;
     }
 
-    // 避免重複插入相同 script
-    const existingScript = document.getElementById('kakao-maps-sdk');
-    if (existingScript) {
-      const interval = setInterval(() => {
-        if ((window as any).kakao && (window as any).kakao.maps) {
-          setKakaoLoaded(true);
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
+    // 2. 如果 window.kakao 存在但尚未 load，直接執行載入
+    if ((window as any).kakao && (window as any).kakao.maps) {
+      initializeKakao();
+      return;
     }
 
+    // 3. 如果 script 已經存在，等待其 onload 觸發
+    const existingScript = document.getElementById('kakao-maps-sdk');
+    if (existingScript) {
+      const handleScriptLoad = () => {
+        initializeKakao();
+      };
+      existingScript.addEventListener('load', handleScriptLoad);
+      return () => {
+        existingScript.removeEventListener('load', handleScriptLoad);
+      };
+    }
+
+    // 4. 否則建立新的 script 標籤
     const script = document.createElement('script');
     script.id = 'kakao-maps-sdk';
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false&libraries=services`;
     script.async = true;
 
     script.onload = () => {
-      (window as any).kakao.maps.load(() => {
-        setKakaoLoaded(true);
-      });
+      initializeKakao();
     };
 
     document.head.appendChild(script);
@@ -114,7 +128,7 @@ export default function MapScreen() {
 
   // 當地圖載入完成且有行程地點時，初始化 Kakao 地圖並畫標記、路徑
   useEffect(() => {
-    if (!kakaoLoaded || locationItems.length === 0) return;
+    if (!kakaoLoaded) return;
 
     const kakao = (window as any).kakao;
     const container = document.getElementById('kakao-map');
@@ -138,12 +152,21 @@ export default function MapScreen() {
 
     let map = mapRef.current;
     if (!map) {
-      let centerLat = 37.5665;
+      let centerLat = 37.5665; // 首爾
       let centerLng = 126.9780;
+      
       if (itemsWithCoords.length > 0) {
         centerLat = itemsWithCoords[0].coords.latitude;
         centerLng = itemsWithCoords[0].coords.longitude;
+      } else if (currentTrip?.destination) {
+        const dest = currentTrip.destination.toLowerCase();
+        if (dest.includes('釜山') || dest.includes('busan')) {
+          centerLat = 35.1796; centerLng = 129.0756;
+        } else if (dest.includes('濟州') || dest.includes('jeju')) {
+          centerLat = 33.4996; centerLng = 126.5312;
+        }
       }
+
       const options = {
         center: new kakao.maps.LatLng(centerLat, centerLng),
         level: 5
@@ -201,7 +224,7 @@ export default function MapScreen() {
       polyline.setMap(map);
       polylineRef.current = polyline;
     }
-  }, [kakaoLoaded, items]);
+  }, [kakaoLoaded, items, currentTrip]);
 
   // 監聽外部傳入的 query (點擊景點卡片)，平滑移動定位
   useEffect(() => {
