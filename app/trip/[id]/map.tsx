@@ -81,6 +81,14 @@ export default function MapScreen() {
     }
   }, [currentTrip?.id, kakaoAppKey]);
 
+  // 當行程資料載入後，若 query 還在預設值則同步更新為目的地
+  useEffect(() => {
+    if (currentTrip && !params.q && (query === '日本' || !query)) {
+      const dest = currentTrip.destination || currentTrip.name || '';
+      if (dest) setQuery(dest);
+    }
+  }, [currentTrip, params.q]);
+
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
@@ -184,122 +192,132 @@ export default function MapScreen() {
   useEffect(() => {
     if (!kakaoLoaded || mapSource !== 'kakao') return;
 
-    const kakao = (window as any).kakao;
-    const container = document.getElementById('kakao-map');
-    if (!container) return;
+    try {
+      const kakao = (window as any).kakao;
+      const container = document.getElementById('kakao-map');
+      if (!container) return;
 
-    // 清除舊的標記與折線，避免資料重疊
-    if (markersRef.current.length > 0) {
-      markersRef.current.forEach(m => m.setMap(null));
-      markersRef.current = [];
-    }
-    if (polylineRef.current) {
-      polylineRef.current.setMap(null);
-      polylineRef.current = null;
-    }
-
-    // 篩選出具有經緯度的景點
-    const itemsWithCoords = locationItems.map((item) => {
-      const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
-      return { item, coords };
-    }).filter(x => x.coords !== null) as Array<{ item: ItineraryItem, coords: { latitude: number, longitude: number } }>;
-
-    let map = mapRef.current;
-    if (!map) {
-      let centerLat = 37.5665; // 首爾
-      let centerLng = 126.9780;
-      
-      if (itemsWithCoords.length > 0) {
-        centerLat = itemsWithCoords[0].coords.latitude;
-        centerLng = itemsWithCoords[0].coords.longitude;
-      } else if (currentTrip?.destination) {
-        const dest = currentTrip.destination.toLowerCase();
-        if (dest.includes('釜山') || dest.includes('busan')) {
-          centerLat = 35.1796; centerLng = 129.0756;
-        } else if (dest.includes('濟州') || dest.includes('jeju')) {
-          centerLat = 33.4996; centerLng = 126.5312;
-        }
+      // 清除舊的標記與折線，避免資料重疊
+      if (markersRef.current.length > 0) {
+        markersRef.current.forEach(m => m.setMap(null));
+        markersRef.current = [];
+      }
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
       }
 
-      const options = {
-        center: new kakao.maps.LatLng(centerLat, centerLng),
-        level: 5
-      };
-      map = new kakao.maps.Map(container, options);
-      mapRef.current = map;
+      // 篩選出具有經緯度的景點
+      const itemsWithCoords = locationItems.map((item) => {
+        const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
+        return { item, coords };
+      }).filter(x => x.coords !== null) as Array<{ item: ItineraryItem, coords: { latitude: number, longitude: number } }>;
 
-      // 加上縮放控制項
-      const zoomControl = new kakao.maps.ZoomControl();
-      map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
-    }
+      let map = mapRef.current;
+      if (!map) {
+        let centerLat = 37.5665; // 首爾
+        let centerLng = 126.9780;
+        
+        if (itemsWithCoords.length > 0) {
+          centerLat = itemsWithCoords[0].coords.latitude;
+          centerLng = itemsWithCoords[0].coords.longitude;
+        } else if (currentTrip?.destination) {
+          const dest = currentTrip.destination.toLowerCase();
+          if (dest.includes('釜山') || dest.includes('busan')) {
+            centerLat = 35.1796; centerLng = 129.0756;
+          } else if (dest.includes('濟州') || dest.includes('jeju')) {
+            centerLat = 33.4996; centerLng = 126.5312;
+          }
+        }
 
-    const bounds = new kakao.maps.LatLngBounds();
-    const linePath: any[] = [];
+        const options = {
+          center: new kakao.maps.LatLng(centerLat, centerLng),
+          level: 5
+        };
+        map = new kakao.maps.Map(container, options);
+        mapRef.current = map;
 
-    itemsWithCoords.forEach((x, idx) => {
-      const position = new kakao.maps.LatLng(x.coords.latitude, x.coords.longitude);
-      bounds.extend(position);
-      linePath.push(position);
+        // 加上縮放控制項
+        const zoomControl = new kakao.maps.ZoomControl();
+        map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+      }
 
-      // 繪製地圖標記
-      const marker = new kakao.maps.Marker({
-        position,
-        map,
-        title: x.item.title
+      const bounds = new kakao.maps.LatLngBounds();
+      const linePath: any[] = [];
+
+      itemsWithCoords.forEach((x, idx) => {
+        const position = new kakao.maps.LatLng(x.coords.latitude, x.coords.longitude);
+        bounds.extend(position);
+        linePath.push(position);
+
+        // 繪製地圖標記
+        const marker = new kakao.maps.Marker({
+          position,
+          map,
+          title: x.item.title
+        });
+        markersRef.current.push(marker);
+
+        // 繪製資訊泡泡氣泡
+        const infowindow = new kakao.maps.InfoWindow({
+          content: `<div style="padding:6px 10px;font-size:12px;color:#2C2C2C;font-family:sans-serif;font-weight:600;white-space:nowrap;border-radius:4px;">${idx + 1}. ${x.item.title}</div>`
+        });
+
+        kakao.maps.event.addListener(marker, 'click', () => {
+          infowindow.open(map, marker);
+        });
       });
-      markersRef.current.push(marker);
 
-      // 繪製資訊泡泡氣泡
-      const infowindow = new kakao.maps.InfoWindow({
-        content: `<div style="padding:6px 10px;font-size:12px;color:#2C2C2C;font-family:sans-serif;font-weight:600;white-space:nowrap;border-radius:4px;">${idx + 1}. ${x.item.title}</div>`
-      });
+      // 自動調整視野邊界
+      if (itemsWithCoords.length > 1) {
+        map.setBounds(bounds);
+      } else if (itemsWithCoords.length === 1) {
+        map.setCenter(new kakao.maps.LatLng(itemsWithCoords[0].coords.latitude, itemsWithCoords[0].coords.longitude));
+      }
 
-      kakao.maps.event.addListener(marker, 'click', () => {
-        infowindow.open(map, marker);
-      });
-    });
-
-    // 自動調整視野邊界
-    if (itemsWithCoords.length > 1) {
-      map.setBounds(bounds);
-    } else if (itemsWithCoords.length === 1) {
-      map.setCenter(new kakao.maps.LatLng(itemsWithCoords[0].coords.latitude, itemsWithCoords[0].coords.longitude));
-    }
-
-    // 繪製路線折線
-    if (linePath.length > 1) {
-      const polyline = new kakao.maps.Polyline({
-        path: linePath,
-        strokeWeight: 4,
-        strokeColor: Colors.primary,
-        strokeOpacity: 0.8,
-        strokeStyle: 'solid'
-      });
-      polyline.setMap(map);
-      polylineRef.current = polyline;
+      // 繪製路線折線
+      if (linePath.length > 1) {
+        const polyline = new kakao.maps.Polyline({
+          path: linePath,
+          strokeWeight: 4,
+          strokeColor: Colors.primary,
+          strokeOpacity: 0.8,
+          strokeStyle: 'solid'
+        });
+        polyline.setMap(map);
+        polylineRef.current = polyline;
+      }
+    } catch (err: any) {
+      console.error('Kakao Map initialization error:', err);
+      setKakaoError(`地圖初始化失敗: ${err.message || err}`);
+      setMapSource('google');
     }
   }, [kakaoLoaded, items, currentTrip, mapSource]);
 
   // 監聽外部傳入的 query (點擊景點卡片)，平滑移動定位
   useEffect(() => {
     if (!mapRef.current || !kakaoLoaded || mapSource !== 'kakao') return;
-    const kakao = (window as any).kakao;
-    const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
+    try {
+      const kakao = (window as any).kakao;
+      const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
 
-    if (isCoord) {
-      const [lat, lng] = query.split(',').map(parseFloat);
-      const position = new kakao.maps.LatLng(lat, lng);
-      mapRef.current.panTo(position);
-      mapRef.current.setLevel(3);
-    } else if (query && query !== '日本') {
-      const ps = new kakao.maps.services.Places();
-      ps.keywordSearch(query, (data: any, status: any) => {
-        if (status === kakao.maps.services.Status.OK) {
-          const position = new kakao.maps.LatLng(data[0].y, data[0].x);
-          mapRef.current.panTo(position);
-          mapRef.current.setLevel(4);
-        }
-      });
+      if (isCoord) {
+        const [lat, lng] = query.split(',').map(parseFloat);
+        const position = new kakao.maps.LatLng(lat, lng);
+        mapRef.current.panTo(position);
+        mapRef.current.setLevel(3);
+      } else if (query && query !== '日本') {
+        const ps = new kakao.maps.services.Places();
+        ps.keywordSearch(query, (data: any, status: any) => {
+          if (status === kakao.maps.services.Status.OK) {
+            const position = new kakao.maps.LatLng(data[0].y, data[0].x);
+            mapRef.current.panTo(position);
+            mapRef.current.setLevel(4);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Kakao Map pan error:', err);
     }
   }, [query, kakaoLoaded, mapSource]);
 
