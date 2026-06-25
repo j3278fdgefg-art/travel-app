@@ -49,6 +49,7 @@ interface DayWeather {
   code: number;
   sunset: string;
   estimated: boolean;
+  cityName?: string;
 }
 
 function getClothing(max: number, min: number): string {
@@ -61,13 +62,16 @@ function getClothing(max: number, min: number): string {
   return '羽絨衣';
 }
 
-async function geocode(name: string): Promise<{ latitude: number; longitude: number } | null> {
+async function geocode(name: string): Promise<{ latitude: number; longitude: number; cityName: string } | null> {
   try {
     const res = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1`
     );
     const data = await res.json();
-    if (data.results?.length) return data.results[0];
+    if (data.results?.length) {
+      const r = data.results[0];
+      return { latitude: r.latitude, longitude: r.longitude, cityName: r.admin1 || r.name || '' };
+    }
   } catch {}
   return null;
 }
@@ -82,7 +86,7 @@ const CITY_DICT: Record<string, string> = {
 };
 
 // 解析目的地 → 經緯度：先查字典、去掉國名前綴，再交給 open-meteo
-async function resolveGeo(destination: string): Promise<{ latitude: number; longitude: number } | null> {
+async function resolveGeo(destination: string): Promise<{ latitude: number; longitude: number; cityName: string } | null> {
   const stripped = destination.replace(/^(韓國|南韓|北韓|日本|台灣|臺灣|中國|泰國|越南|美國|英國|法國)/, '').trim();
   const candidates: string[] = [];
   for (const key of [stripped, destination]) if (CITY_DICT[key]) candidates.push(CITY_DICT[key]);
@@ -300,6 +304,7 @@ export default function ItineraryScreen() {
           code: dd.weather_code[idx] ?? 0,
           sunset: dd.sunset?.[idx] ? String(dd.sunset[idx]).slice(11, 16) : '',
           estimated: false,
+          cityName: geo.cityName,
         } : null;
         setItemWeatherCache((prev) => ({ ...prev, [cacheKey]: w }));
       } catch {
@@ -479,6 +484,7 @@ export default function ItineraryScreen() {
                         const wmo = getWmo(w.code);
                         return (
                           <View style={styles.itemWeather}>
+                            {w.cityName ? <Text style={styles.itemWeatherCity}>📍 {w.cityName}</Text> : null}
                             <Text style={styles.itemWeatherText}>{wmo.emoji} {wmo.label}</Text>
                             <Text style={styles.itemWeatherText}>🌡️ {w.max}° / {w.min}°</Text>
                             <Text style={styles.itemWeatherText}>🌧️ {w.rain}%</Text>
@@ -661,6 +667,7 @@ const styles = StyleSheet.create({
   itemChevron: { fontSize: 13, color: Colors.textLight },
   itemDetail: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.background },
   itemWeather: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 },
+  itemWeatherCity: { fontSize: 11, color: Colors.textSecondary, fontWeight: '500', width: '100%', marginBottom: -4 },
   itemWeatherText: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   itemWeatherEst: { fontSize: 10, color: Colors.accent },
   itemLocation: { fontSize: 12, color: Colors.textSecondary },
