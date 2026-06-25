@@ -315,87 +315,40 @@ export default function ItineraryScreen() {
         </View>
       </View>
 
-      {/* 天氣卡（固定在頂部，隨選擇日期更新） */}
+      {/* Day 卡 + 右側小天氣（依設計：行程 Day 詳情 - 版本A） */}
       {currentTrip && days[selectedDay] && (() => {
-        const w = weatherMap[days[selectedDay].date];
+        const day = days[selectedDay];
+        const w = weatherMap[day.date];
         const dest = currentTrip.destination || currentTrip.name || '';
-        const dayNum = days[selectedDay].day_number;
-        const dateStr = dayjs(days[selectedDay].date).format('M/DD');
-        if (!w) {
-          const noDataLabel = weatherLoading ? '載入中…' : weatherFailed ? '找不到地點' : `${dateStr} 可以預測天氣`;
-          return (
-            <View style={styles.weatherCard}>
-              <View style={styles.weatherCardTop}>
-                <View style={styles.weatherIconBox}>
-                  <Text style={styles.weatherEmoji}>{weatherLoading ? '🌡️' : weatherFailed ? '🔍' : '🗓️'}</Text>
-                </View>
-                <View style={styles.weatherCardCenter}>
-                  <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
-                  <Text style={styles.weatherDate}>{dateStr}</Text>
-                </View>
-                {!weatherLoading && weatherFailed && (
-                  <TouchableOpacity onPress={() => setShowWeatherInput((v) => !v)} style={styles.weatherSetBtn}>
-                    <Text style={styles.weatherSetBtnText}>設定地名</Text>
-                  </TouchableOpacity>
-                )}
-                {!weatherLoading && !weatherFailed && (
-                  <Text style={styles.weatherCondition}>{noDataLabel}</Text>
-                )}
-              </View>
-              {showWeatherInput && (
-                <View style={styles.weatherInputRow}>
-                  <TextInput
-                    style={styles.weatherInputField}
-                    value={weatherInput}
-                    onChangeText={setWeatherInput}
-                    placeholder="輸入英文地名 e.g. Busan"
-                    placeholderTextColor={Colors.textLight}
-                    autoFocus
-                    returnKeyType="search"
-                    onSubmitEditing={() => {
-                      const v = weatherInput.trim();
-                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                      setShowWeatherInput(false);
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.weatherSearchBtn}
-                    onPress={() => {
-                      const v = weatherInput.trim();
-                      if (v) { localStorage.setItem(`weather_loc_${id}`, v); setWeatherOverride(v); }
-                      setShowWeatherInput(false);
-                    }}
-                  >
-                    <Text style={styles.weatherSearchBtnText}>搜尋</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          );
-        }
-        const { emoji, label } = getWmo(w.code);
-        const clothing = getClothing(w.max, w.min);
+        const d = dayjs(day.date);
+        const wd = ['日', '一', '二', '三', '四', '五', '六'][d.day()];
+        const dateStr = `${d.format('M/D')} 星期${wd}`;
+        const wmo = w ? getWmo(w.code) : null;
         return (
-          <View style={styles.weatherCard}>
-            <View style={styles.weatherCardTop}>
-              <View style={styles.weatherIconBox}>
-                <Text style={styles.weatherEmoji}>{emoji}</Text>
+          <View style={styles.dayCardWrap}>
+            <View style={styles.dayCard}>
+              <View style={styles.dayCardIcon}>
+                <Text style={{ fontSize: 22 }}>📅</Text>
               </View>
-              <View style={styles.weatherCardCenter}>
-                <Text style={styles.weatherDayTitle}>Day {dayNum}{dest ? ` · ${dest}` : ''}</Text>
-                <Text style={styles.weatherDate}>{dateStr}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.dayCardTitle} numberOfLines={1}>Day {day.day_number}{dest ? ` · ${dest}` : ''}</Text>
+                <Text style={styles.dayCardDate}>{dateStr}</Text>
               </View>
-              <View style={styles.weatherCardRight}>
-                <Text style={styles.weatherCondition}>{label}</Text>
-                <Text style={styles.weatherTemp}>{w.max}° / {w.min}°</Text>
-              </View>
-            </View>
-            <View style={styles.weatherCardBottom}>
-              {!!w.sunset && <Text style={styles.weatherInfoItem}>🌅 {w.sunset}</Text>}
-              <Text style={styles.weatherInfoItem}>🌂 {w.rain}%</Text>
-              <Text style={styles.weatherInfoItem}>👕 {clothing}</Text>
-              <TouchableOpacity onPress={() => setShowWeatherInput((v) => !v)}>
-                <Text style={[styles.weatherInfoItem, { color: Colors.textLight }]}>🔍</Text>
+              <TouchableOpacity style={styles.dayWeather} activeOpacity={0.7} onPress={() => setShowWeatherInput((v) => !v)}>
+                {w && wmo ? (
+                  <>
+                    <View style={styles.dayWeatherTop}>
+                      <Text style={{ fontSize: 18 }}>{wmo.emoji}</Text>
+                      <Text style={styles.dayWeatherTemp}>{w.max}°</Text>
+                    </View>
+                    <Text style={styles.dayWeatherSub}>{wmo.label} · {w.min}°</Text>
+                  </>
+                ) : (
+                  <View style={styles.dayWeatherTop}>
+                    <Text style={{ fontSize: 14 }}>{weatherLoading ? '🌡️' : '🔍'}</Text>
+                    <Text style={styles.dayWeatherSet}>{weatherLoading ? '載入中' : '設定地名'}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
             {showWeatherInput && (
@@ -404,7 +357,7 @@ export default function ItineraryScreen() {
                   style={styles.weatherInputField}
                   value={weatherInput}
                   onChangeText={setWeatherInput}
-                  placeholder="輸入英文地名 e.g. Okayama"
+                  placeholder="輸入英文地名 e.g. Busan"
                   placeholderTextColor={Colors.textLight}
                   autoFocus
                   returnKeyType="search"
@@ -613,7 +566,7 @@ export default function ItineraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.primary },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.primaryDark },
   backBtn: { marginRight: 10, padding: 4 },
   tripName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   tripDate: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
@@ -626,20 +579,16 @@ const styles = StyleSheet.create({
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  weatherCard: { backgroundColor: Colors.card, marginHorizontal: 12, marginTop: 8, marginBottom: 4, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  weatherCardTop: { flexDirection: 'row', alignItems: 'center' },
-  weatherIconBox: { width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginRight: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-  weatherEmoji: { fontSize: 28 },
-  weatherCardCenter: { flex: 1, minWidth: 0 },
-  weatherDayTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  weatherDate: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
-  weatherCardRight: { alignItems: 'flex-end' },
-  weatherCondition: { fontSize: 13, color: Colors.textSecondary },
-  weatherTemp: { fontSize: 15, fontWeight: '700', color: Colors.text, marginTop: 2 },
-  weatherCardBottom: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
-  weatherInfoItem: { fontSize: 13, color: Colors.textSecondary },
-  weatherSetBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: Colors.primaryLight },
-  weatherSetBtnText: { fontSize: 12, color: Colors.primaryDark, fontWeight: '600' },
+  dayCardWrap: { marginHorizontal: 12, marginTop: 12 },
+  dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.card, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  dayCardIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(124,154,107,0.14)', justifyContent: 'center', alignItems: 'center' },
+  dayCardTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  dayCardDate: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  dayWeather: { alignItems: 'flex-end', minWidth: 60 },
+  dayWeatherTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dayWeatherTemp: { fontSize: 17, fontWeight: '700', color: Colors.text },
+  dayWeatherSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  dayWeatherSet: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   weatherInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   weatherInputField: { flex: 1, height: 38, backgroundColor: Colors.background, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   weatherSearchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.primary },
