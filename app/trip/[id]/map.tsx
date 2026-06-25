@@ -63,13 +63,20 @@ export default function MapScreen() {
   };
 
   const handleNavigate = () => {
-    const dest = encodeURIComponent(query);
-    const origin = currentCoords ? encodeURIComponent(`${currentCoords.lat},${currentCoords.lng}`) : '';
-    // Google Maps 官方通用網址：裝了 APP 自動喚起，沒裝開網頁版，不會跳 App Store
-    const navUrl = origin
-      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`
-      : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
-    window.open(navUrl, '_blank');
+    const ua = navigator.userAgent;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+
+    if (isMobile) {
+      // 手機：nmap:// 喚起 Naver Maps APP，沒裝則 fallback 網頁版
+      const webUrl = `https://map.naver.com/v5/search/${encodeURIComponent(query)}`;
+      window.location.href = `nmap://route/car?dname=${encodeURIComponent(query)}&appname=com.travelapp`;
+      // 頁面失焦代表 APP 成功開啟，取消 fallback
+      const timer = setTimeout(() => { window.open(webUrl, '_blank'); }, 1200);
+      const cancel = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', cancel); };
+      document.addEventListener('visibilitychange', cancel);
+    } else {
+      window.open(`https://map.naver.com/v5/search/${encodeURIComponent(query)}`, '_blank');
+    }
   };
 
   const handleSaveUrl = async () => {
