@@ -308,14 +308,28 @@ export default function MapScreen() {
         mapRef.current.panTo(position);
         mapRef.current.setLevel(3);
       } else if (query && query !== '日本') {
-        const ps = new kakao.maps.services.Places();
-        ps.keywordSearch(query, (data: any, status: any) => {
-          if (status === kakao.maps.services.Status.OK) {
-            const position = new kakao.maps.LatLng(data[0].y, data[0].x);
-            mapRef.current.panTo(position);
-            mapRef.current.setLevel(4);
-          }
-        });
+        const tryGeocodeFallback = () => {
+          geocodePlace(query).then((geo) => {
+            if (geo && mapRef.current) {
+              mapRef.current.panTo(new kakao.maps.LatLng(geo.latitude, geo.longitude));
+              mapRef.current.setLevel(5);
+            }
+          });
+        };
+
+        if (kakao.maps.services?.Places) {
+          const ps = new kakao.maps.services.Places();
+          ps.keywordSearch(query, (data: any, status: any) => {
+            if (status === kakao.maps.services.Status.OK && mapRef.current) {
+              mapRef.current.panTo(new kakao.maps.LatLng(data[0].y, data[0].x));
+              mapRef.current.setLevel(4);
+            } else {
+              tryGeocodeFallback();
+            }
+          });
+        } else {
+          tryGeocodeFallback();
+        }
       }
     } catch (err) {
       console.error('Kakao Map pan error:', err);
