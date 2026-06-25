@@ -12,9 +12,18 @@ function loadBg(): BgVariant {
   return 'mountain';
 }
 
+function loadKakaoKey(): string {
+  try {
+    return localStorage.getItem('kakao_app_key') || '';
+  } catch {}
+  return '';
+}
+
 interface SettingsState {
   background: BgVariant;
   setBackground: (b: BgVariant) => void;
+  kakaoAppKey: string;
+  setKakaoAppKey: (key: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -22,6 +31,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setBackground: (b) => {
     try { localStorage.setItem(KEY, b); } catch {}
     set({ background: b });
+  },
+  kakaoAppKey: typeof localStorage !== 'undefined' ? loadKakaoKey() : '',
+  setKakaoAppKey: (key) => {
+    try { localStorage.setItem('kakao_app_key', key); } catch {}
+    set({ kakaoAppKey: key });
   },
 }));
 

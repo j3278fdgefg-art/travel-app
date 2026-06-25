@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -14,7 +14,7 @@ const THUMB: Record<BgVariant, any> = {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { background, setBackground } = useSettingsStore();
+  const { background, setBackground, kakaoAppKey, setKakaoAppKey } = useSettingsStore();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,6 +54,28 @@ export default function SettingsScreen() {
             );
           })}
         </View>
+
+        {/* Kakao 韓國地圖設定 */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Kakao 韓國地圖設定</Text>
+        <Text style={styles.sectionDesc}>
+          若此行程為韓國旅行，您可填入免費申請的 Kakao JavaScript Key，以啟用網頁內嵌地圖上的景點標記與路徑畫線功能。
+        </Text>
+        <View style={styles.kakaoCard}>
+          <Text style={styles.kakaoLabel}>JavaScript App Key</Text>
+          <TextInput
+            style={styles.kakaoInput}
+            value={kakaoAppKey}
+            onChangeText={setKakaoAppKey}
+            placeholder="請貼上您的 JavaScript App Key"
+            placeholderTextColor={Colors.textLight}
+            secureTextEntry={true}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.kakaoHelp}>
+            ※ 請至 Kakao Developers 後台註冊此 App 的網域 (如 http://localhost:8081)。若未填寫，地圖會自動退回使用備用 Google 地圖。
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -74,4 +96,8 @@ const styles = StyleSheet.create({
   optName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   optDesc: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
   radioOff: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.border },
+  kakaoCard: { backgroundColor: Colors.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20 },
+  kakaoLabel: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
+  kakaoInput: { height: 44, borderRadius: 8, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, color: Colors.text, backgroundColor: Colors.background },
+  kakaoHelp: { fontSize: 11, color: Colors.textSecondary, marginTop: 8, lineHeight: 16 },
 });

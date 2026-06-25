@@ -3,9 +3,10 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   SafeAreaView, Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
-import { useGlobalSearchParams } from 'expo-router';
+import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { useSettingsStore } from '../../../store/settingsStore';
 import { ItineraryItem } from '../../../types';
 import {
   extractUrl,
@@ -39,7 +40,9 @@ const typeMeta = (t?: string) => TYPE_META[t || 'other'] || { emoji: t || '📍'
 
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
+  const router = useRouter();
   const { currentTrip, items, fetchTripById, fetchItems } = useTripStore();
+  const { kakaoAppKey } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const iframeRef = useRef<any>(null);
 
@@ -51,6 +54,9 @@ export default function MapScreen() {
   const [locating, setLocating] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
 
+  // 行程地點：取有填 location 的行程項目
+  const locationItems = items.filter((item) => item.location?.trim());
+
   useEffect(() => {
     if (id) { fetchTripById(id); fetchItems(id); }
   }, [id]);
@@ -61,6 +67,164 @@ export default function MapScreen() {
       setQuery(q); setMapKey((k) => k + 1);
     }
   }, [params.q]);
+
+  const [kakaoLoaded, setKakaoLoaded] = useState(false);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polylineRef = useRef<any>(null);
+
+  // 動態載入 Kakao Maps SDK 腳本
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !kakaoAppKey) {
+      setKakaoLoaded(false);
+      return;
+    }
+
+    // 檢查 window.kakao 是否已存在
+    if ((window as any).kakao && (window as any).kakao.maps) {
+      setKakaoLoaded(true);
+      return;
+    }
+
+    // 避免重複插入相同 script
+    const existingScript = document.getElementById('kakao-maps-sdk');
+    if (existingScript) {
+      const interval = setInterval(() => {
+        if ((window as any).kakao && (window as any).kakao.maps) {
+          setKakaoLoaded(true);
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+
+    const script = document.createElement('script');
+    script.id = 'kakao-maps-sdk';
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false&libraries=services`;
+    script.async = true;
+
+    script.onload = () => {
+      (window as any).kakao.maps.load(() => {
+        setKakaoLoaded(true);
+      });
+    };
+
+    document.head.appendChild(script);
+  }, [kakaoAppKey]);
+
+  // 當地圖載入完成且有行程地點時，初始化 Kakao 地圖並畫標記、路徑
+  useEffect(() => {
+    if (!kakaoLoaded || locationItems.length === 0) return;
+
+    const kakao = (window as any).kakao;
+    const container = document.getElementById('kakao-map');
+    if (!container) return;
+
+    // 清除舊的標記與折線，避免資料重疊
+    if (markersRef.current.length > 0) {
+      markersRef.current.forEach(m => m.setMap(null));
+      markersRef.current = [];
+    }
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+
+    // 篩選出具有經緯度的景點
+    const itemsWithCoords = locationItems.map((item) => {
+      const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
+      return { item, coords };
+    }).filter(x => x.coords !== null) as Array<{ item: ItineraryItem, coords: { latitude: number, longitude: number } }>;
+
+    let map = mapRef.current;
+    if (!map) {
+      let centerLat = 37.5665;
+      let centerLng = 126.9780;
+      if (itemsWithCoords.length > 0) {
+        centerLat = itemsWithCoords[0].coords.latitude;
+        centerLng = itemsWithCoords[0].coords.longitude;
+      }
+      const options = {
+        center: new kakao.maps.LatLng(centerLat, centerLng),
+        level: 5
+      };
+      map = new kakao.maps.Map(container, options);
+      mapRef.current = map;
+
+      // 加上縮放控制項
+      const zoomControl = new kakao.maps.ZoomControl();
+      map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+    }
+
+    const bounds = new kakao.maps.LatLngBounds();
+    const linePath: any[] = [];
+
+    itemsWithCoords.forEach((x, idx) => {
+      const position = new kakao.maps.LatLng(x.coords.latitude, x.coords.longitude);
+      bounds.extend(position);
+      linePath.push(position);
+
+      // 繪製地圖標記
+      const marker = new kakao.maps.Marker({
+        position,
+        map,
+        title: x.item.title
+      });
+      markersRef.current.push(marker);
+
+      // 繪製資訊泡泡氣泡
+      const infowindow = new kakao.maps.InfoWindow({
+        content: `<div style="padding:6px 10px;font-size:12px;color:#2C2C2C;font-family:sans-serif;font-weight:600;white-space:nowrap;border-radius:4px;">${idx + 1}. ${x.item.title}</div>`
+      });
+
+      kakao.maps.event.addListener(marker, 'click', () => {
+        infowindow.open(map, marker);
+      });
+    });
+
+    // 自動調整視野邊界
+    if (itemsWithCoords.length > 1) {
+      map.setBounds(bounds);
+    } else if (itemsWithCoords.length === 1) {
+      map.setCenter(new kakao.maps.LatLng(itemsWithCoords[0].coords.latitude, itemsWithCoords[0].coords.longitude));
+    }
+
+    // 繪製路線折線
+    if (linePath.length > 1) {
+      const polyline = new kakao.maps.Polyline({
+        path: linePath,
+        strokeWeight: 4,
+        strokeColor: Colors.primary,
+        strokeOpacity: 0.8,
+        strokeStyle: 'solid'
+      });
+      polyline.setMap(map);
+      polylineRef.current = polyline;
+    }
+  }, [kakaoLoaded, items]);
+
+  // 監聽外部傳入的 query (點擊景點卡片)，平滑移動定位
+  useEffect(() => {
+    if (!mapRef.current || !kakaoLoaded) return;
+    const kakao = (window as any).kakao;
+    const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
+
+    if (isCoord) {
+      const [lat, lng] = query.split(',').map(parseFloat);
+      const position = new kakao.maps.LatLng(lat, lng);
+      mapRef.current.panTo(position);
+      mapRef.current.setLevel(3);
+    } else if (query && query !== '日本') {
+      const ps = new kakao.maps.services.Places();
+      ps.keywordSearch(query, (data: any, status: any) => {
+        if (status === kakao.maps.services.Status.OK) {
+          const position = new kakao.maps.LatLng(data[0].y, data[0].x);
+          mapRef.current.panTo(position);
+          mapRef.current.setLevel(4);
+        }
+      });
+    }
+  }, [query, kakaoLoaded]);
 
   const handleLocate = () => {
     if (!navigator.geolocation) return alert('瀏覽器不支援定位');
@@ -152,13 +316,38 @@ export default function MapScreen() {
     setMapKey((k) => k + 1);
   };
 
-  // 行程地點：取有填 location 的行程項目
-  const locationItems = items.filter((item) => item.location?.trim());
 
   const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
   const mapSrc = isCoord
     ? `https://maps.google.com/maps?q=${query}&output=embed&hl=zh-TW&z=16`
     : `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed&hl=zh-TW&z=15`;
+
+  const renderMap = () => {
+    if (kakaoAppKey) {
+      if (!kakaoLoaded) {
+        return (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={[styles.centerText, { marginTop: 12 }]}>正在載入 Kakao 地圖...</Text>
+          </View>
+        );
+      }
+      return <div id="kakao-map" style={{ width: '100%', height: '100%' }} />;
+    }
+
+    return (
+      <iframe
+        key={mapKey}
+        ref={iframeRef}
+        src={mapSrc}
+        style={{ width: '100%', height: '100%', border: 'none' }}
+        allowFullScreen
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        allow="geolocation"
+      />
+    );
+  };
 
   if (Platform.OS !== 'web') {
     return (
@@ -235,17 +424,17 @@ export default function MapScreen() {
 
       {/* 地圖 */}
       <View style={styles.mapContainer}>
-        <iframe
-          key={mapKey}
-          ref={iframeRef}
-          src={mapSrc}
-          style={{ width: '100%', height: '100%', border: 'none' }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="geolocation"
-        />
+        {renderMap()}
       </View>
+
+      {/* 提示使用者設定 Kakao 金鑰 */}
+      {!kakaoAppKey && (
+        <TouchableOpacity style={styles.kakaoTip} onPress={() => router.push('/settings' as any)}>
+          <Text style={styles.kakaoTipText}>
+            💡 正在使用備用 Google 地圖。您可至「設定」填入 Kakao 金鑰，啟用精美的內嵌韓國地圖與路線畫線！
+          </Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -282,4 +471,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centerEmoji: { fontSize: 60, marginBottom: 16 },
   centerText: { fontSize: 16, color: Colors.textSecondary },
+  kakaoTip: { marginHorizontal: 12, marginBottom: 10, padding: 10, backgroundColor: '#FCF9F2', borderRadius: 10, borderWidth: 1, borderColor: Colors.border },
+  kakaoTipText: { fontSize: 11, color: Colors.accent, fontWeight: '500', textAlign: 'center', lineHeight: 16 },
 });
