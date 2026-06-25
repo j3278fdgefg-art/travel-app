@@ -64,28 +64,12 @@ export default function MapScreen() {
 
   const handleNavigate = () => {
     const dest = encodeURIComponent(query);
-    const ua = navigator.userAgent;
-    const isIOS = /iPhone|iPad|iPod/i.test(ua);
-    const isAndroid = /Android/i.test(ua);
-
-    if (isIOS) {
-      // Apple 地圖 (內建，不會跳 App Store)
-      const origin = currentCoords ? `&saddr=${currentCoords.lat},${currentCoords.lng}` : '';
-      window.location.href = `maps://maps.apple.com/?daddr=${dest}${origin}&dirflg=d`;
-    } else if (isAndroid) {
-      // Android 原生地圖選擇器
-      const origin = currentCoords ? `${currentCoords.lat},${currentCoords.lng}` : '';
-      window.location.href = origin
-        ? `geo:${origin}?q=${dest}`
-        : `geo:0,0?q=${dest}`;
-    } else {
-      // 桌機：開新分頁
-      const origin = currentCoords ? encodeURIComponent(`${currentCoords.lat},${currentCoords.lng}`) : '';
-      const navUrl = origin
-        ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`
-        : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
-      window.open(navUrl, '_blank');
-    }
+    const origin = currentCoords ? encodeURIComponent(`${currentCoords.lat},${currentCoords.lng}`) : '';
+    // Google Maps 官方通用網址：裝了 APP 自動喚起，沒裝開網頁版，不會跳 App Store
+    const navUrl = origin
+      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
+    window.open(navUrl, '_blank');
   };
 
   const handleSaveUrl = async () => {
