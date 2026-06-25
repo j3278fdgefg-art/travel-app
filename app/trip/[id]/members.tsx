@@ -302,7 +302,7 @@ export default function MembersScreen() {
                 >
                   {isOwner && (
                     <TouchableOpacity style={styles.cardDelete} onPress={() => handleRemove(m)}>
-                      <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+                      <Text style={{ fontSize: 12 }}>🗑️</Text>
                     </TouchableOpacity>
                   )}
                   <View style={styles.avatarCircle}>

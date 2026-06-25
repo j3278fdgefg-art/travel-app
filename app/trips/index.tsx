@@ -128,7 +128,6 @@ export default function TripsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>你好 👋</Text>
           <Text style={styles.headerTitle}>我的旅程</Text>
         </View>
         <TouchableOpacity onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} style={styles.signOutBtn}>

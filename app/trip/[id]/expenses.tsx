@@ -422,11 +422,11 @@ export default function ExpensesScreen() {
 
                         <View style={styles.detailActions}>
                           <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(e)}>
-                            <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+                            <Text style={styles.btnEmoji}>✏️</Text>
                             <Text style={styles.editBtnText}>編輯</Text>
                           </TouchableOpacity>
                           <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(e)}>
-                            <Ionicons name="trash-outline" size={14} color={Colors.danger} />
+                            <Text style={styles.btnEmoji}>🗑️</Text>
                             <Text style={styles.deleteBtnText}>刪除</Text>
                           </TouchableOpacity>
                         </View>
@@ -628,6 +628,7 @@ const styles = StyleSheet.create({
   splitPersonName: { fontSize: 12, color: Colors.text, fontWeight: '500' },
   splitPersonAmt: { fontSize: 11, color: Colors.primary },
   detailActions: { flexDirection: 'row', gap: 10, marginTop: 12, justifyContent: 'flex-end' },
+  btnEmoji: { fontSize: 13 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primaryLight },
   editBtnText: { color: Colors.primary, fontSize: 13 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FEE2E2' },

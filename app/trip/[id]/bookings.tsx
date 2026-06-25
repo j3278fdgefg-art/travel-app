@@ -312,11 +312,11 @@ export default function BookingsScreen() {
               <Text style={styles.visibleTag}>🔒 限定可見</Text>
             )}
             <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(b)}>
-              <Ionicons name="pencil-outline" size={13} color={Colors.primary} />
+              <Text style={styles.btnEmoji}>✏️</Text>
               <Text style={styles.editBtnText}>編輯</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(b)}>
-              <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+              <Text style={styles.btnEmoji}>🗑️</Text>
               <Text style={styles.deleteBtnText}>刪除</Text>
             </TouchableOpacity>
           </View>
@@ -577,9 +577,7 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>預訂管理</Text>
-      </View>
+      <View style={{ height: 12 }} />
 
       <View style={styles.tabs}>
         {TABS.map((t) => (
@@ -710,6 +708,7 @@ const styles = StyleSheet.create({
   footerAmount: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   cardActions: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8 },
   visibleTag: { fontSize: 11, color: Colors.textSecondary, flex: 1 },
+  btnEmoji: { fontSize: 12 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.primaryLight },
   editBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },

@@ -165,23 +165,24 @@ function toDbType(emoji: string): string {
 }
 const PALETTE = ['#5A8AAD', '#9B6BBF', '#D4A853', '#5AAD6B', '#AD5A5A', '#5A9E9E', '#AD7B5A'];
 
-// 依目的地推測國旗（行程 Day 卡左側圖示，取代日曆 emoji）
+// 依目的地給一個可愛的代表圖示（行程 Day 卡左側）。
+// 註：旗幟 emoji 在 Windows 瀏覽器不會顯示（會變成 KR/JP 字母），所以用一般 emoji。
 function destFlag(dest: string): string {
   const map: Array<[RegExp, string]> = [
-    [/韓國|南韓|首爾|釜山|濟州|仁川|大邱|慶州/, '🇰🇷'],
-    [/日本|東京|大阪|京都|岡山|北海道|沖繩|那霸|福岡|名古屋|札幌|神戶|橫濱|廣島/, '🇯🇵'],
-    [/台灣|臺灣|台北|臺北|高雄|台中|台南/, '🇹🇼'],
-    [/泰國|曼谷|清邁|普吉/, '🇹🇭'],
-    [/越南|峴港|河內|胡志明/, '🇻🇳'],
-    [/新加坡/, '🇸🇬'],
-    [/香港/, '🇭🇰'],
-    [/澳門/, '🇲🇴'],
-    [/中國|上海|北京|成都/, '🇨🇳'],
-    [/美國/, '🇺🇸'],
-    [/英國|倫敦/, '🇬🇧'],
-    [/法國|巴黎/, '🇫🇷'],
+    [/韓國|南韓|首爾|釜山|濟州|仁川|大邱|慶州/, '🐯'],
+    [/日本|東京|大阪|京都|岡山|北海道|沖繩|那霸|福岡|名古屋|札幌|神戶|橫濱|廣島/, '🗻'],
+    [/台灣|臺灣|台北|臺北|高雄|台中|台南/, '🧋'],
+    [/泰國|曼谷|清邁|普吉/, '🐘'],
+    [/越南|峴港|河內|胡志明/, '🍜'],
+    [/新加坡/, '🦁'],
+    [/香港/, '🏙️'],
+    [/澳門/, '🎰'],
+    [/中國|上海|北京|成都/, '🐼'],
+    [/美國|紐約|洛杉磯/, '🗽'],
+    [/英國|倫敦/, '🎡'],
+    [/法國|巴黎/, '🗼'],
   ];
-  for (const [re, flag] of map) if (re.test(dest)) return flag;
+  for (const [re, icon] of map) if (re.test(dest)) return icon;
   return '🧳';
 }
 
@@ -505,10 +506,10 @@ export default function ItineraryScreen() {
                   </View>
                   <View style={styles.itemBtns}>
                     <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-                      <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+                      <Text style={styles.itemBtnEmoji}>✏️</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
-                      <Ionicons name="trash-outline" size={14} color={Colors.danger} />
+                      <Text style={styles.itemBtnEmoji}>🗑️</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -654,7 +655,7 @@ const styles = StyleSheet.create({
   dayBtnDate: { fontSize: 13, color: Colors.text, fontWeight: '500' },
   dayBtnDateSelected: { color: '#fff' },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  dayCardWrap: { marginHorizontal: 12, marginTop: 12 },
+  dayCardWrap: { marginHorizontal: 12, marginTop: 12, marginBottom: 10 },
   dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.card, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   dayCardIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(124,154,107,0.14)', justifyContent: 'center', alignItems: 'center' },
   dayCardTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
@@ -682,9 +683,10 @@ const styles = StyleSheet.create({
   itemLocation: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   mapLink: { color: Colors.primary, fontWeight: '500' },
   itemNote: { fontSize: 12, color: Colors.textLight, marginTop: 4 },
-  itemBtns: { flexDirection: 'column', gap: 4 },
-  editBtn: { padding: 6, borderRadius: 8, backgroundColor: Colors.background },
-  deleteBtn: { padding: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  itemBtns: { flexDirection: 'row', gap: 6 },
+  editBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  deleteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
+  itemBtnEmoji: { fontSize: 13 },
   emptyDay: { alignItems: 'center', marginTop: 80 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },

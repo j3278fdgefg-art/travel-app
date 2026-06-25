@@ -124,9 +124,7 @@ export default function MapScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>地圖</Text>
-      </View>
+      <View style={{ height: 12 }} />
 
       {/* 搜尋列 */}
       <View style={styles.searchRow}>
@@ -140,15 +138,15 @@ export default function MapScreen() {
           returnKeyType="search"
         />
         <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <Ionicons name="search" size={18} color="#fff" />
+          <Text style={styles.searchBtnEmoji}>🔍</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.locateBtn} onPress={handleLocate} disabled={locating}>
           {locating
             ? <ActivityIndicator size="small" color={Colors.primary} />
-            : <Ionicons name="locate" size={18} color={Colors.primary} />}
+            : <Text style={styles.ctrlEmoji}>📍</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={styles.navBtn} onPress={handleNavigate}>
-          <Ionicons name="navigate" size={18} color="#fff" />
+          <Text style={styles.ctrlEmoji}>🧭</Text>
         </TouchableOpacity>
       </View>
 
@@ -265,6 +263,8 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', paddingHorizontal: 8, gap: 4, marginBottom: 6, marginTop: 8 },
   searchInput: { flex: 1, height: 38, backgroundColor: Colors.card, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   searchBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  searchBtnEmoji: { fontSize: 17 },
+  ctrlEmoji: { fontSize: 17 },
   locateBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   navBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
   navBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8, marginBottom: 6, backgroundColor: Colors.info, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },

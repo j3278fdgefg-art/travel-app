@@ -74,9 +74,7 @@ export default function ChecklistScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>準備清單</Text>
-      </View>
+      <View style={{ height: 12 }} />
 
       <View style={styles.tabs}>
         {TABS.map((t) => (
@@ -127,10 +125,10 @@ export default function ChecklistScreen() {
               </Text>
               <View style={styles.itemActions}>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => handleEdit(item)}>
-                  <Ionicons name="pencil-outline" size={16} color={Colors.textSecondary} />
+                  <Text style={styles.actionEmoji}>✏️</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
-                  <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleDelete(item)}>
+                  <Text style={styles.actionEmoji}>🗑️</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -210,7 +208,9 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, fontSize: 15, color: Colors.text },
   itemTextDone: { textDecorationLine: 'line-through', color: Colors.textLight },
   itemActions: { flexDirection: 'row', gap: 4 },
-  actionBtn: { padding: 6, borderRadius: 8, backgroundColor: Colors.background },
+  actionBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  actionBtnDanger: { backgroundColor: '#FBE8E8', borderColor: '#FBE8E8' },
+  actionEmoji: { fontSize: 14 },
   emptyText: { fontSize: 13, color: Colors.textLight, textAlign: 'center', paddingVertical: 16 },
   suggestionTitle: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500', marginBottom: 10 },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.background },
