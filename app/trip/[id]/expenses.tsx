@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, ActivityIndicator, Platform, useWindowDimensions,
+  SafeAreaView, Modal, TextInput, ActivityIndicator, Platform,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import dayjs from 'dayjs';
@@ -91,7 +91,6 @@ function calcSettlement(balances: { name: string; net: number }[]) {
 }
 
 export default function ExpensesScreen() {
-  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, expenses, members, fetchExpenses, fetchMembers, fetchTripById, addExpense, deleteExpense, updateExpense, logActivity } = useTripStore();
   const { user } = useAuthStore();
@@ -441,8 +440,7 @@ export default function ExpensesScreen() {
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
+          <ScrollView style={styles.modalBox} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60 }}>
             <Text style={styles.modalTitle}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
 
             <Text style={styles.label}>類別</Text>
@@ -551,7 +549,6 @@ export default function ExpensesScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
-          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -625,9 +622,7 @@ const styles = StyleSheet.create({
   ownerNote: { textAlign: 'center', fontSize: 12, color: Colors.textSecondary, paddingVertical: 8 },
   fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1, padding: 24 },
-  modalContent: { paddingBottom: 60 },
+  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '92%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },

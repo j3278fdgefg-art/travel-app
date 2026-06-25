@@ -63,10 +63,14 @@ export default function MapScreen() {
   };
 
   const handleNavigate = () => {
+    // 使用 Google Maps API URL 格式，手機不會跳 App Store
     const dest = encodeURIComponent(query);
-    const navUrl = currentCoords
-      ? `https://www.google.com/maps/dir/${currentCoords.lat},${currentCoords.lng}/${dest}`
-      : `https://www.google.com/maps/dir//${dest}`;
+    const origin = currentCoords
+      ? `${currentCoords.lat},${currentCoords.lng}`
+      : '';
+    const navUrl = origin
+      ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${dest}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
     window.open(navUrl, '_blank');
   };
 
@@ -139,6 +143,15 @@ export default function MapScreen() {
           <Ionicons name="list" size={18} color={showPanel ? '#fff' : Colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* 導航快捷列 */}
+      {query && query !== defaultQuery && (
+        <TouchableOpacity style={styles.navBar} onPress={handleNavigate}>
+          <Ionicons name="navigate" size={16} color="#fff" />
+          <Text style={styles.navBarText}>從目前位置導航到「{search}」</Text>
+          <Ionicons name="open-outline" size={14} color="rgba(255,255,255,0.8)" />
+        </TouchableOpacity>
+      )}
 
       {/* 可收合面板 */}
       {showPanel && (
@@ -221,6 +234,8 @@ const styles = StyleSheet.create({
   navBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.info, justifyContent: 'center', alignItems: 'center' },
   listBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   listBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  navBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 8, marginBottom: 6, backgroundColor: Colors.info, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  navBarText: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '500' },
   panel: { marginHorizontal: 12, marginBottom: 8, backgroundColor: Colors.card, borderRadius: 16, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   panelTitle: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
   chipScroll: { maxHeight: 90 },
