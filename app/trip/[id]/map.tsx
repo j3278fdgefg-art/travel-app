@@ -170,6 +170,7 @@ export default function MapScreen() {
     script.id = 'kakao-maps-sdk';
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false&libraries=services`;
     script.async = true;
+    script.referrerPolicy = 'no-referrer-when-downgrade';
 
     script.onload = () => {
       initializeKakao();
