@@ -250,9 +250,9 @@ export default function MembersScreen() {
                   <Text style={styles.shareIcon}>💬</Text>
                   <Text style={styles.shareBtnText}>LINE 分享</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.shareBtn} onPress={copyPermLink}>
+                <TouchableOpacity style={[styles.shareBtn, styles.shareBtnPurple]} onPress={copyPermLink}>
                   <Text style={styles.shareIcon}>{copiedPerm ? '✅' : '♾️'}</Text>
-                  <Text style={styles.shareBtnText}>{copiedPerm ? '已複製' : '複製永久連結'}</Text>
+                  <Text style={[styles.shareBtnText, styles.shareBtnTextPurple]}>{copiedPerm ? '已複製' : '複製永久連結'}</Text>
                 </TouchableOpacity>
               </View>
               {copiedPerm && <Text style={styles.copiedHint}>永久連結已複製！（可重複使用）</Text>}
@@ -281,7 +281,9 @@ export default function MembersScreen() {
                     <Text style={styles.avatarEmoji}>{ownerMember.avatar_emoji}</Text>
                   </View>
                   <Text style={styles.memberName}>{ownerMember.display_name}</Text>
-                  <Text style={styles.roleTag}>👑 主辦人</Text>
+                  <View style={[styles.roleBadge, styles.roleBadgeOwner]}>
+                    <Text style={styles.roleBadgeOwnerText}>👑 主辦人</Text>
+                  </View>
                   {!!ownerMember.line_id && <Text style={styles.contactTag}>💬 {ownerMember.line_id}</Text>}
                   {!!ownerMember.ig_handle && <Text style={styles.contactTag}>📸 {ownerMember.ig_handle}</Text>}
                 </TouchableOpacity>
@@ -298,20 +300,20 @@ export default function MembersScreen() {
                   onPress={() => canEdit && openEdit(m)}
                   activeOpacity={canEdit ? 0.7 : 1}
                 >
+                  {isOwner && (
+                    <TouchableOpacity style={styles.cardDelete} onPress={() => handleRemove(m)}>
+                      <Ionicons name="trash-outline" size={13} color={Colors.danger} />
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.avatarCircle}>
                     <Text style={styles.avatarEmoji}>{m.avatar_emoji}</Text>
                   </View>
                   <Text style={styles.memberName}>{m.display_name}</Text>
-                  <Text style={styles.roleTag}>✈️ 旅伴</Text>
+                  <View style={[styles.roleBadge, styles.roleBadgeMember]}>
+                    <Text style={styles.roleBadgeMemberText}>✈️ 旅伴</Text>
+                  </View>
                   {!!m.line_id && <Text style={styles.contactTag}>💬 {m.line_id}</Text>}
                   {!!m.ig_handle && <Text style={styles.contactTag}>📸 {m.ig_handle}</Text>}
-                  <View style={styles.memberActions}>
-                    {isOwner && (
-                      <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(m)}>
-                        <Ionicons name="trash-outline" size={13} color={Colors.danger} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -468,34 +470,38 @@ export default function MembersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  tripHeader: { margin: 16, borderRadius: 18, backgroundColor: Colors.primary, padding: 20, alignItems: 'center' },
+  tripHeader: { margin: 16, borderRadius: 18, backgroundColor: Colors.primaryDark, padding: 20, alignItems: 'center' },
   tripName: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4, textAlign: 'center' },
-  tripDate: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
+  tripDate: { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginBottom: 8 },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  syncDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accentLight },
+  syncDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E8C56B' },
   syncText: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
-  shareSectionLabel: { fontSize: 11, color: 'rgba(255,255,255,0.75)', marginBottom: 6, marginTop: 4 },
-  shareRow: { flexDirection: 'row', gap: 8 },
-  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  shareIcon: { fontSize: 15 },
-  shareBtnText: { color: Colors.primary, fontWeight: '600', fontSize: 13 },
+  shareSectionLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 8, marginTop: 8 },
+  shareRow: { flexDirection: 'row', gap: 9, alignSelf: 'stretch' },
+  shareBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff', paddingVertical: 11, borderRadius: 12 },
+  shareBtnPurple: { backgroundColor: '#6C63C7' },
+  shareIcon: { fontSize: 14 },
+  shareBtnText: { color: Colors.text, fontWeight: '600', fontSize: 13 },
+  shareBtnTextPurple: { color: '#fff' },
   copiedHint: { color: 'rgba(255,255,255,0.9)', fontSize: 11, marginTop: 8 },
   section: { marginHorizontal: 16, marginBottom: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
   sectionHint: { fontSize: 12, color: Colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  memberCard: { width: '47%', backgroundColor: Colors.card, borderRadius: 16, padding: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  ownerCard: { borderWidth: 2, borderColor: Colors.accent },
-  avatarCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  ownerAvatarCircle: { backgroundColor: '#FFF8E7' },
-  avatarEmoji: { fontSize: 32 },
-  memberName: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 2, textAlign: 'center' },
-  roleTag: { fontSize: 11, color: Colors.textSecondary, marginBottom: 2 },
-  contactTag: { fontSize: 10, color: Colors.textLight, marginBottom: 2 },
-  memberActions: { flexDirection: 'row', gap: 8 },
-  editBtn: { padding: 6, borderRadius: 8, backgroundColor: Colors.background },
-  removeBtn: { padding: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  memberCard: { width: '47%', backgroundColor: Colors.card, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: '#EDE7DA', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  ownerCard: { borderWidth: 2, borderColor: '#D4A94E' },
+  avatarCircle: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F7F2E4', justifyContent: 'center', alignItems: 'center', marginBottom: 9 },
+  ownerAvatarCircle: { backgroundColor: '#F7F2E4' },
+  avatarEmoji: { fontSize: 28 },
+  memberName: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 2, textAlign: 'center' },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, marginTop: 5 },
+  roleBadgeOwner: { backgroundColor: 'rgba(212,169,78,0.16)' },
+  roleBadgeOwnerText: { fontSize: 11, fontWeight: '600', color: '#A67A1F' },
+  roleBadgeMember: { backgroundColor: 'rgba(124,154,107,0.14)' },
+  roleBadgeMemberText: { fontSize: 11, fontWeight: '600', color: '#5A7A4A' },
+  contactTag: { fontSize: 10, color: Colors.textLight, marginTop: 3 },
+  cardDelete: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   addCard: { width: '47%', backgroundColor: Colors.card, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.border, borderStyle: 'dashed', minHeight: 130 },
   addCardText: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   emptyLog: { fontSize: 13, color: Colors.textLight, textAlign: 'center', paddingVertical: 20 },
