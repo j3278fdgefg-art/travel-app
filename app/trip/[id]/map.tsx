@@ -129,6 +129,7 @@ export default function MapScreen() {
   const drawGenRef = useRef(0);
   const showRouteRef = useRef(true);
   const searchMarkerRef = useRef<any>(null);
+  const pendingQRef = useRef<string | null>(null);
 
   const locationItems = items.filter((item) => item.location?.trim());
 
@@ -137,8 +138,22 @@ export default function MapScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (params.q) { setQuery(decodeURIComponent(params.q as string)); setMapKey((k) => k + 1); }
+    if (params.q) {
+      const q = decodeURIComponent(params.q as string);
+      setSearch(q);
+      if (placesRef.current) searchAndShow(q);
+      else pendingQRef.current = q; // 地圖還沒載入，待載入後再標出
+    }
   }, [params.q]);
+
+  // 地圖載入完成後，補處理從行程頁帶進來的 q（放標記 + 跳資訊卡）
+  useEffect(() => {
+    if (gLoaded && pendingQRef.current) {
+      const q = pendingQRef.current;
+      pendingQRef.current = null;
+      searchAndShow(q);
+    }
+  }, [gLoaded]);
 
   useEffect(() => {
     if (currentTrip && !params.q && (query === '釜山' || !query)) {
@@ -273,20 +288,7 @@ export default function MapScreen() {
     );
   };
 
-  const handleSearch = () => {
-    const s = search.trim();
-    if (!s) return;
-    setPredictions([]);
-    if (placesRef.current) {
-      // 搜尋到地點 → 放標記 + 跳資訊卡
-      googleTextSearch(placesRef.current, s).then((c) => {
-        if (c?.placeId) showPlaceDetails(c.placeId);
-        else { setQuery(s); setMapKey((k) => k + 1); }
-      });
-    } else {
-      setQuery(s); setMapKey((k) => k + 1); // 無金鑰退回內嵌地圖
-    }
-  };
+  const handleSearch = () => searchAndShow(search.trim());
 
   // 打字時用 Places 文字搜尋取得更多建議地點（最多 ~20 筆、可滑動）
   const onSearchChange = (t: string) => {
@@ -469,6 +471,23 @@ export default function MapScreen() {
     setShowFav(false);
     if (f.place_id && placesRef.current) { showPlaceDetails(f.place_id); return; }
     if (f.lat != null && f.lng != null) { markAt(f.lat, f.lng, f.name); }
+  };
+
+  // 搜尋一個字串 → 放標記 + 跳資訊卡（搜尋列、行程頁帶 q 跳轉共用）
+  const searchAndShow = (s: string) => {
+    if (!s) return;
+    setPredictions([]);
+    const coordMatch = s.match(/^(-?\d+\.\d+),(-?\d+\.\d+)$/);
+    if (coordMatch) { markAt(Number(coordMatch[1]), Number(coordMatch[2])); return; }
+    if (placesRef.current) {
+      googleTextSearch(placesRef.current, s).then((c) => {
+        if (c?.placeId) showPlaceDetails(c.placeId);
+        else if (c) markAt(c.latitude, c.longitude, s);
+        else { setQuery(s); setMapKey((k) => k + 1); }
+      });
+    } else {
+      setQuery(s); setMapKey((k) => k + 1); // 無金鑰退回內嵌地圖
+    }
   };
 
   const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
