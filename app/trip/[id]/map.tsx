@@ -147,14 +147,6 @@ export default function MapScreen() {
     }
   }, [params.q]);
 
-  // 地圖載入完成後，補處理從行程頁帶進來的 q（放標記 + 跳資訊卡）
-  useEffect(() => {
-    if (gLoaded && pendingQRef.current) {
-      const q = pendingQRef.current;
-      pendingQRef.current = null;
-      searchAndShow(q);
-    }
-  }, [gLoaded]);
 
   useEffect(() => {
     if (currentTrip && !params.q && (query === '釜山' || !query)) {
@@ -198,6 +190,13 @@ export default function MapScreen() {
         mapRef.current.addListener('click', (e: any) => {
           if (e.placeId) { e.stop(); showPlaceDetails(e.placeId); }
         });
+
+        // places service 剛建好，處理行程頁帶進來的 pending query
+        if (pendingQRef.current) {
+          const pq = pendingQRef.current;
+          pendingQRef.current = null;
+          setTimeout(() => searchAndShow(pq), 0);
+        }
       }
       const map = mapRef.current;
       const gen = ++drawGenRef.current; // 防止非同步重入造成重疊孤兒線
@@ -464,7 +463,13 @@ export default function MapScreen() {
     }
     const c = await resolveItemCoords(item, placesRef.current);
     if (c?.placeId) { showPlaceDetails(c.placeId); return; }
-    if (c) { markAt(c.latitude, c.longitude, item.title); return; }
+    // 從 URL 拿到座標但沒有 placeId → 仍用地名搜尋以拿到資訊卡
+    if (c) {
+      const hit = await googleTextSearch(placesRef.current, item.title);
+      if (hit?.placeId) { showPlaceDetails(hit.placeId); return; }
+      markAt(c.latitude, c.longitude, item.title);
+      return;
+    }
     setQuery(buildSearchQuery(item)); setMapKey((k) => k + 1);
   };
 
