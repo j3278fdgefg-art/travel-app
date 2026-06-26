@@ -288,17 +288,21 @@ export default function MapScreen() {
     }
   };
 
-  // 打字時取得 Google 地點建議（自動完成）
+  // 打字時用 Places 文字搜尋取得更多建議地點（最多 ~20 筆、可滑動）
   const onSearchChange = (t: string) => {
     setSearch(t);
     if (acTimer.current) clearTimeout(acTimer.current);
-    if (!t.trim() || !acServiceRef.current) { setPredictions([]); return; }
+    if (!t.trim() || !placesRef.current) { setPredictions([]); return; }
     acTimer.current = setTimeout(() => {
-      acServiceRef.current.getPlacePredictions({ input: t }, (preds: any, status: any) => {
+      placesRef.current.textSearch({ query: t }, (results: any, status: any) => {
         const g = (window as any).google;
-        setPredictions(status === g.maps.places.PlacesServiceStatus.OK && preds ? preds.slice(0, 5) : []);
+        if (status === g.maps.places.PlacesServiceStatus.OK && results) {
+          setPredictions(results.slice(0, 20).map((r: any) => ({
+            place_id: r.place_id, name: r.name, address: r.formatted_address,
+          })));
+        } else setPredictions([]);
       });
-    }, 220);
+    }, 350);
   };
 
   const pickPrediction = (p: any) => {
@@ -325,7 +329,7 @@ export default function MapScreen() {
         try { openNow = res.opening_hours?.isOpen?.(); } catch {}
         if (openNow === undefined) openNow = res.opening_hours?.open_now;
         const loc = res.geometry?.location;
-        const reviews = (res.reviews || []).slice(0, 4).map((r: any) => ({
+        const reviews = (res.reviews || []).map((r: any) => ({
           author: r.author_name, rating: r.rating, text: r.text, time: r.relative_time_description,
         }));
         setRoute(null);
@@ -510,14 +514,17 @@ export default function MapScreen() {
             )}
           </View>
           {predictions.length > 0 && (
-            <View style={styles.acDropdown}>
+            <ScrollView style={styles.acDropdown} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator>
               {predictions.map((p) => (
                 <TouchableOpacity key={p.place_id} style={styles.acRow} onPress={() => pickPrediction(p)}>
                   <Text style={styles.acIcon}>📍</Text>
-                  <Text style={styles.acText} numberOfLines={1}>{p.description}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.acName} numberOfLines={1}>{p.name || p.description}</Text>
+                    {!!p.address && <Text style={styles.acAddr} numberOfLines={1}>{p.address}</Text>}
+                  </View>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
         </View>
 
@@ -720,10 +727,11 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 17 },
   searchInput: { flex: 1, height: '100%', fontSize: 15, color: Colors.text },
   searchClear: { fontSize: 15, color: Colors.textLight, paddingHorizontal: 4 },
-  acDropdown: { position: 'absolute', top: 64, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
-  acRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  acDropdown: { position: 'absolute', top: 64, left: 0, right: 0, maxHeight: 320, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  acRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9 },
   acIcon: { fontSize: 13 },
-  acText: { flex: 1, fontSize: 13, color: Colors.text },
+  acName: { fontSize: 14, color: Colors.text, fontWeight: '500' },
+  acAddr: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
   // 右側控制按鈕
   ctrlStack: { position: 'absolute', top: 86, right: 14, gap: 8, zIndex: 5 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
@@ -744,7 +752,7 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
-  sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: 360, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: '78%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
   placeCardBody: { padding: 14 },
   placeCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
