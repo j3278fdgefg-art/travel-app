@@ -490,8 +490,9 @@ export default function ItineraryScreen() {
                   <Text style={styles.timeText}>{item.time}</Text>
                 </View>
                 <View style={styles.dotCol}>
+                  {idx > 0 && <View style={styles.lineTop} />}
+                  {idx < currentDayItems.length - 1 && <View style={styles.lineBottom} />}
                   <View style={[styles.dot, { backgroundColor: emojiColor(typeEmoji(item.type)) }]} />
-                  {idx < currentDayItems.length - 1 && <View style={styles.line} />}
                 </View>
                 <View style={styles.itemCard}>
                   {/* 收合狀態：只有圖示 + 名稱 */}
@@ -776,13 +777,14 @@ const styles = StyleSheet.create({
   dayBtnDateSelected: { color: '#fff' },
   dayBtnWeekday: { fontSize: 10, color: Colors.textLight, marginTop: 1 },
   timeline: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-  timelineRow: { flexDirection: 'row', marginBottom: 8 },
-  timeCol: { width: 50, paddingTop: 10 },
+  timelineRow: { flexDirection: 'row' },
+  timeCol: { width: 50, justifyContent: 'center' },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
-  dotCol: { width: 24, alignItems: 'center', marginRight: 12 },
-  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 10 },
-  line: { width: 2, flex: 1, backgroundColor: Colors.border, marginTop: 4 },
-  itemCard: { flex: 1, backgroundColor: Colors.card, borderRadius: 14, padding: 14, marginBottom: 4, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  dotCol: { width: 24, marginRight: 12, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#fff', zIndex: 1 },
+  lineTop: { position: 'absolute', top: 0, height: '50%', width: 2, left: '50%', marginLeft: -1, backgroundColor: Colors.border },
+  lineBottom: { position: 'absolute', bottom: 0, height: '50%', width: 2, left: '50%', marginLeft: -1, backgroundColor: Colors.border },
+  itemCard: { flex: 1, backgroundColor: Colors.card, borderRadius: 14, padding: 14, marginVertical: 4, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemEmoji: { fontSize: 20 },
   itemTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
