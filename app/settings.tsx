@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -14,7 +14,7 @@ const THUMB: Record<BgVariant, any> = {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { background, setBackground, googleMapsApiKey, setGoogleMapsApiKey } = useSettingsStore();
+  const { background, setBackground } = useSettingsStore();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,27 +54,6 @@ export default function SettingsScreen() {
             );
           })}
         </View>
-
-        {/* Google 地圖設定 */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Google 地圖設定</Text>
-        <Text style={styles.sectionDesc}>
-          填入 Google Maps JavaScript API 金鑰，即可在地圖頁同時釘出所有行程地點、連出路線、並可點選互動。未填寫則退回基本內嵌地圖。
-        </Text>
-        <View style={styles.kakaoCard}>
-          <Text style={styles.kakaoLabel}>Google Maps API Key</Text>
-          <TextInput
-            style={styles.kakaoInput}
-            value={googleMapsApiKey}
-            onChangeText={setGoogleMapsApiKey}
-            placeholder="請貼上您的 Google Maps API Key"
-            placeholderTextColor={Colors.textLight}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={styles.kakaoHelp}>
-            ※ 到 Google Cloud Console 開啟「Maps JavaScript API」與「Places API」，建立金鑰後限制可用網域（HTTP referrer）為你的 Vercel 網址與 http://localhost:8081。每月 $200 免費額度，一般用量免費。
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -95,8 +74,4 @@ const styles = StyleSheet.create({
   optName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   optDesc: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
   radioOff: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.border },
-  kakaoCard: { backgroundColor: Colors.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.border, marginBottom: 20 },
-  kakaoLabel: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 8 },
-  kakaoInput: { height: 44, borderRadius: 8, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 12, fontSize: 14, color: Colors.text, backgroundColor: Colors.background },
-  kakaoHelp: { fontSize: 11, color: Colors.textSecondary, marginTop: 8, lineHeight: 16 },
 });

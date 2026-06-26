@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   SafeAreaView, Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
-import { useGlobalSearchParams, useRouter } from 'expo-router';
+import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
 import { useSettingsStore } from '../../../store/settingsStore';
@@ -74,7 +74,6 @@ async function resolveItemCoords(item: ItineraryItem, service: any): Promise<{ l
 
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
-  const router = useRouter();
   const { currentTrip, items, fetchTripById, fetchItems } = useTripStore();
   const { googleMapsApiKey } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
@@ -325,11 +324,11 @@ export default function MapScreen() {
               referrerPolicy="no-referrer-when-downgrade"
               allow="geolocation"
             />
-            <TouchableOpacity style={styles.keyHint} onPress={() => router.push('/settings' as any)}>
-              <Text style={styles.keyHintText}>
-                {gError ? '⚠️ 地圖金鑰載入失敗，點此檢查設定' : '＋ 設定 Google 金鑰可釘出所有行程點與路線'}
-              </Text>
-            </TouchableOpacity>
+            {gError && (
+              <View style={styles.keyHint}>
+                <Text style={styles.keyHintText}>⚠️ Google 地圖載入失敗，顯示基本地圖</Text>
+              </View>
+            )}
           </>
         )}
       </View>

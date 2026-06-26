@@ -12,23 +12,14 @@ function loadBg(): BgVariant {
   return 'mountain';
 }
 
-// 金鑰來源優先序：1) 使用者在設定頁手動輸入（localStorage）2) 建置環境變數（Vercel / .env.local）
-// 金鑰不寫進原始碼，避免提交到公開 repo。
+// Google 地圖金鑰只從建置環境變數讀取（Vercel 環境變數 / 本機 .env.local）。
+// 不寫進原始碼、也不需在設定頁輸入，所有訪客的網頁版都能用。
 const ENV_GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
-
-function loadGoogleKey(): string {
-  try {
-    const stored = localStorage.getItem('google_maps_api_key');
-    if (stored) return stored;
-  } catch {}
-  return ENV_GOOGLE_KEY;
-}
 
 interface SettingsState {
   background: BgVariant;
   setBackground: (b: BgVariant) => void;
   googleMapsApiKey: string;
-  setGoogleMapsApiKey: (key: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -37,11 +28,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try { localStorage.setItem(KEY, b); } catch {}
     set({ background: b });
   },
-  googleMapsApiKey: typeof localStorage !== 'undefined' ? loadGoogleKey() : ENV_GOOGLE_KEY,
-  setGoogleMapsApiKey: (key) => {
-    try { localStorage.setItem('google_maps_api_key', key); } catch {}
-    set({ googleMapsApiKey: key });
-  },
+  googleMapsApiKey: ENV_GOOGLE_KEY,
 }));
 
 export const BG_OPTIONS: Array<{ key: BgVariant; name: string; desc: string }> = [
