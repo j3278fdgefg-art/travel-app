@@ -128,6 +128,19 @@ export default function TripsScreen() {
     );
   };
 
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.origin : '';
+    const data = { title: '旅遊小幫手', text: '一起來用旅遊小幫手規劃旅程吧！', url };
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share(data);
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert('已複製 App 連結：\n' + url);
+      }
+    } catch {}
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
@@ -136,6 +149,9 @@ export default function TripsScreen() {
           <Text style={styles.headerTitle}>我的旅程</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={handleShare} style={styles.signOutBtn}>
+            <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings' as any)} style={styles.signOutBtn}>
             <Ionicons name="settings-outline" size={18} color={Colors.textSecondary} />
           </TouchableOpacity>
