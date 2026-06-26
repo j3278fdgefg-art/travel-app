@@ -12,18 +12,16 @@ function loadBg(): BgVariant {
   return 'mountain';
 }
 
-function loadKakaoKey(): string {
-  try {
-    return localStorage.getItem('kakao_app_key') || '52d43b8e1afce47c2d5242fdfa438596';
-  } catch {}
-  return '52d43b8e1afce47c2d5242fdfa438596';
+function loadKey(storageKey: string): string {
+  try { return localStorage.getItem(storageKey) || ''; } catch {}
+  return '';
 }
 
 interface SettingsState {
   background: BgVariant;
   setBackground: (b: BgVariant) => void;
-  kakaoAppKey: string;
-  setKakaoAppKey: (key: string) => void;
+  googleMapsApiKey: string;
+  setGoogleMapsApiKey: (key: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -32,10 +30,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try { localStorage.setItem(KEY, b); } catch {}
     set({ background: b });
   },
-  kakaoAppKey: typeof localStorage !== 'undefined' ? loadKakaoKey() : '52d43b8e1afce47c2d5242fdfa438596',
-  setKakaoAppKey: (key) => {
-    try { localStorage.setItem('kakao_app_key', key); } catch {}
-    set({ kakaoAppKey: key });
+  googleMapsApiKey: typeof localStorage !== 'undefined' ? loadKey('google_maps_api_key') : '',
+  setGoogleMapsApiKey: (key) => {
+    try { localStorage.setItem('google_maps_api_key', key); } catch {}
+    set({ googleMapsApiKey: key });
   },
 }));
 

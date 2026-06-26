@@ -14,7 +14,7 @@ const THUMB: Record<BgVariant, any> = {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { background, setBackground, kakaoAppKey, setKakaoAppKey } = useSettingsStore();
+  const { background, setBackground, googleMapsApiKey, setGoogleMapsApiKey } = useSettingsStore();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,25 +55,24 @@ export default function SettingsScreen() {
           })}
         </View>
 
-        {/* Kakao 韓國地圖設定 */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Kakao 韓國地圖設定</Text>
+        {/* Google 地圖設定 */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Google 地圖設定</Text>
         <Text style={styles.sectionDesc}>
-          若此行程為韓國旅行，您可填入免費申請的 Kakao JavaScript Key，以啟用網頁內嵌地圖上的景點標記與路徑畫線功能。
+          填入 Google Maps JavaScript API 金鑰，即可在地圖頁同時釘出所有行程地點、連出路線、並可點選互動。未填寫則退回基本內嵌地圖。
         </Text>
         <View style={styles.kakaoCard}>
-          <Text style={styles.kakaoLabel}>JavaScript App Key</Text>
+          <Text style={styles.kakaoLabel}>Google Maps API Key</Text>
           <TextInput
             style={styles.kakaoInput}
-            value={kakaoAppKey}
-            onChangeText={setKakaoAppKey}
-            placeholder="請貼上您的 JavaScript App Key"
+            value={googleMapsApiKey}
+            onChangeText={setGoogleMapsApiKey}
+            placeholder="請貼上您的 Google Maps API Key"
             placeholderTextColor={Colors.textLight}
-            secureTextEntry={false}
             autoCapitalize="none"
             autoCorrect={false}
           />
           <Text style={styles.kakaoHelp}>
-            ※ 請至 Kakao Developers 後台註冊此 App 的網域 (如 http://localhost:8081)。若未填寫，地圖會自動退回使用備用 Google 地圖。
+            ※ 到 Google Cloud Console 開啟「Maps JavaScript API」與「Places API」，建立金鑰後限制可用網域（HTTP referrer）為你的 Vercel 網址與 http://localhost:8081。每月 $200 免費額度，一般用量免費。
           </Text>
         </View>
       </ScrollView>
