@@ -228,10 +228,12 @@ export default function MapScreen() {
     }
   }, [gLoaded, items, currentTrip]);
 
-  // 切換行程標記/路線顯示
+  // 切換行程標記/路線顯示（標記、行程綠線、導航路線都一起）
   useEffect(() => {
-    markersRef.current.forEach((m) => m.setMap(showRoute ? mapRef.current : null));
-    if (polylineRef.current) polylineRef.current.setMap(showRoute ? mapRef.current : null);
+    const m = showRoute ? mapRef.current : null;
+    markersRef.current.forEach((mk) => mk.setMap(m));
+    polylineRef.current?.setMap(m);
+    dirRendererRef.current?.setMap(m);
   }, [showRoute]);
 
   // query 改變 → 平移地圖（點地點卡片 / 定位）
@@ -329,6 +331,7 @@ export default function MapScreen() {
         (result: any, status: any) => {
           setRouting(false);
           if (status === 'OK' && result.routes?.[0]) {
+            dirRendererRef.current.setMap(mapRef.current);
             dirRendererRef.current.setDirections(result);
             const leg = result.routes[0].legs[0];
             setRoute({
@@ -370,22 +373,31 @@ export default function MapScreen() {
     addFavorite({ trip_id: id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, place_id: p.placeId });
   };
 
-  // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
+  // 導航：優先喚起 Google 地圖 APP；APP 一開啟就取消網頁版 fallback（回到 App 不會卡在網頁地圖）
   const navigateToQuery = () => {
     const dest = query && query !== defaultQuery ? query : (currentTrip?.destination || query);
     if (!dest) { alert('請先搜尋或點選一個地點'); return; }
     const enc = encodeURIComponent(dest);
     const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${enc}`;
     const ua = navigator.userAgent;
-    if (/iPhone|iPad|iPod/i.test(ua)) {
-      window.location.href = `comgooglemaps://?daddr=${enc}&directionsmode=driving`;
-      setTimeout(() => { window.location.href = webUrl; }, 1200);
-    } else if (/Android/i.test(ua)) {
-      window.location.href = `google.navigation:q=${enc}`;
-      setTimeout(() => { window.location.href = webUrl; }, 1200);
-    } else {
-      window.open(webUrl, 'travelExt');
-    }
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+    if (!isMobile) { window.open(webUrl, 'travelExt'); return; }
+
+    const scheme = /Android/i.test(ua) ? `google.navigation:q=${enc}` : `comgooglemaps://?daddr=${enc}&directionsmode=driving`;
+    let timer: any;
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', cancel);
+      window.removeEventListener('blur', cancel);
+    };
+    const cancel = () => { if (timer) clearTimeout(timer); cleanup(); };
+    const onVis = () => { if (document.hidden) cancel(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', cancel);
+    window.addEventListener('blur', cancel);
+    // 1.5 秒內若 App 沒開（頁面仍可見）才退回網頁版
+    timer = setTimeout(() => { cleanup(); window.open(webUrl, 'travelExt'); }, 1500);
+    window.location.href = scheme;
   };
 
   // 點地點卡片 → 地圖移過去（並更新搜尋框與導航目標）
