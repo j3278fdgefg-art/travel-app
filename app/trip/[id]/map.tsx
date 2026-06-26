@@ -27,13 +27,14 @@ const PLACE_TYPE_ZH: Record<string, string> = {
 };
 const placeTypeLabel = (t?: string) => (t ? PLACE_TYPE_ZH[t] || t.replace(/_/g, ' ') : '');
 
-// 由 location 字串擷取可搜尋的地名/地址（去掉「[NAVER 地图]」前綴與網址）
+// 由 item 建立搜尋詞：優先用 title（店名），地址文字只作為備用
 function buildSearchQuery(item: { location?: string; title: string }): string {
+  if (item.title.trim()) return item.title.trim();
   let loc = (item.location || '').trim();
   loc = loc.replace(/^\[[^\]]*\]\s*/, '');
   loc = loc.replace(/https?:\/\/\S+/g, '').trim();
   loc = loc.replace(/[，,]\s*$/, '').trim();
-  return loc || item.title;
+  return loc;
 }
 
 // 載入 Google Maps JS API（只載一次）

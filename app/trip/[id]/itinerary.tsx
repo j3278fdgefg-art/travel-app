@@ -430,10 +430,11 @@ export default function ItineraryScreen() {
   };
 
   const openInMap = (item: ItineraryItem) => {
-    // 新地圖用 Places textSearch，需要文字地名；把 location 的 URL 去掉，沒有就用標題
-    let q = (item.location || '').replace(/https?:\/\/\S+/g, '').replace(/[，,]\s*$/, '').trim();
-    if (!q) q = item.title;
-    router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
+    // 優先用 title（店名）讓 Places textSearch 找到完整店家資訊卡
+    // 地址文字只在 title 為空時才用
+    const q = item.title.trim() ||
+      (item.location || '').replace(/https?:\/\/\S+/g, '').replace(/[，,]\s*$/, '').trim();
+    if (q) router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
 
   // 編輯兩個行程間的交通（存在「後一個」項目上）
