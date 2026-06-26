@@ -30,6 +30,42 @@ async function geocodePlace(name: string): Promise<{ latitude: number; longitude
   return null;
 }
 
+// 由項目的 location 字串擷取可搜尋的地名/地址（去掉「[NAVER 地图]」前綴與網址）
+function buildSearchQuery(item: { location?: string; title: string }): string {
+  let loc = (item.location || '').trim();
+  loc = loc.replace(/^\[[^\]]*\]\s*/, '');       // 去掉 [NAVER 地图] 之類前綴
+  loc = loc.replace(/https?:\/\/\S+/g, '').trim(); // 去掉網址
+  loc = loc.replace(/[，,]\s*$/, '').trim();
+  return loc || item.title;
+}
+
+// Kakao 地點關鍵字搜尋 → 座標
+function kakaoKeywordSearch(kakao: any, query: string): Promise<{ latitude: number; longitude: number } | null> {
+  return new Promise((resolve) => {
+    if (!query || !kakao?.maps?.services?.Places) return resolve(null);
+    try {
+      const ps = new kakao.maps.services.Places();
+      ps.keywordSearch(query, (data: any, status: any) => {
+        if (status === kakao.maps.services.Status.OK && data?.[0]) {
+          resolve({ latitude: parseFloat(data[0].y), longitude: parseFloat(data[0].x) });
+        } else resolve(null);
+      });
+    } catch { resolve(null); }
+  });
+}
+
+// 把一個行程項目解析成座標：URL 座標 → Kakao 關鍵字搜尋 → open-meteo 退路
+async function resolveItemCoords(item: ItineraryItem, kakao: any): Promise<{ latitude: number; longitude: number } | null> {
+  const fromUrl = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
+  if (fromUrl) return fromUrl;
+  const cleaned = buildSearchQuery(item);
+  for (const q of [cleaned, item.title].filter(Boolean)) {
+    const hit = await kakaoKeywordSearch(kakao, q);
+    if (hit) return hit;
+  }
+  return geocodePlace(cleaned);
+}
+
 const TYPE_META: Record<string, { emoji: string; label: string }> = {
   transport: { emoji: '🚃', label: '交通' },
   accommodation: { emoji: '🏨', label: '住宿' },
@@ -194,23 +230,13 @@ export default function MapScreen() {
         polylineRef.current = null;
       }
 
-      // 篩選出具有經緯度的景點
-      const itemsWithCoords = locationItems.map((item) => {
-        const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
-        return { item, coords };
-      }).filter(x => x.coords !== null) as Array<{ item: ItineraryItem, coords: { latitude: number, longitude: number } }>;
-
       let map = mapRef.current;
       // 若 div 是全新空白（剛從 Google 切回），舊 map 已綁定消失的 DOM，需重建
       if (!map || !container.firstChild) {
         mapRef.current = null;
         let centerLat = 37.5665; // 首爾
         let centerLng = 126.9780;
-        
-        if (itemsWithCoords.length > 0) {
-          centerLat = itemsWithCoords[0].coords.latitude;
-          centerLng = itemsWithCoords[0].coords.longitude;
-        } else if (currentTrip?.destination) {
+        if (currentTrip?.destination) {
           const dest = currentTrip.destination.toLowerCase();
           if (dest.includes('釜山') || dest.includes('busan')) {
             centerLat = 35.1796; centerLng = 129.0756;
@@ -218,64 +244,45 @@ export default function MapScreen() {
             centerLat = 33.4996; centerLng = 126.5312;
           }
         }
-
-        const options = {
-          center: new kakao.maps.LatLng(centerLat, centerLng),
-          level: 5
-        };
-        map = new kakao.maps.Map(container, options);
+        map = new kakao.maps.Map(container, { center: new kakao.maps.LatLng(centerLat, centerLng), level: 6 });
         mapRef.current = map;
-
-        // 加上縮放控制項
-        const zoomControl = new kakao.maps.ZoomControl();
-        map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
       }
 
-      const bounds = new kakao.maps.LatLngBounds();
-      const linePath: any[] = [];
+      // 以 Kakao 關鍵字搜尋把每個地點轉成座標，再畫標記與路線
+      (async () => {
+        const resolved: Array<{ item: ItineraryItem; lat: number; lng: number }> = [];
+        for (const item of locationItems) {
+          const coords = await resolveItemCoords(item, kakao);
+          if (coords) resolved.push({ item, lat: coords.latitude, lng: coords.longitude });
+        }
+        if (mapRef.current !== map) return; // 地圖已重建，放棄這批
 
-      itemsWithCoords.forEach((x, idx) => {
-        const position = new kakao.maps.LatLng(x.coords.latitude, x.coords.longitude);
-        bounds.extend(position);
-        linePath.push(position);
-
-        // 繪製地圖標記
-        const marker = new kakao.maps.Marker({
-          position,
-          map,
-          title: x.item.title
+        const bounds = new kakao.maps.LatLngBounds();
+        const linePath: any[] = [];
+        resolved.forEach(({ item, lat, lng }, idx) => {
+          const position = new kakao.maps.LatLng(lat, lng);
+          bounds.extend(position);
+          linePath.push(position);
+          const marker = new kakao.maps.Marker({ position, map, title: item.title });
+          markersRef.current.push(marker);
+          const infowindow = new kakao.maps.InfoWindow({
+            content: `<div style="padding:6px 10px;font-size:12px;color:#2C2C2C;font-family:sans-serif;font-weight:600;white-space:nowrap;border-radius:4px;">${idx + 1}. ${item.title}</div>`,
+          });
+          kakao.maps.event.addListener(marker, 'click', () => infowindow.open(map, marker));
         });
-        markersRef.current.push(marker);
 
-        // 繪製資訊泡泡氣泡
-        const infowindow = new kakao.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;color:#2C2C2C;font-family:sans-serif;font-weight:600;white-space:nowrap;border-radius:4px;">${idx + 1}. ${x.item.title}</div>`
-        });
+        if (resolved.length > 1) map.setBounds(bounds);
+        else if (resolved.length === 1) map.setCenter(new kakao.maps.LatLng(resolved[0].lat, resolved[0].lng));
 
-        kakao.maps.event.addListener(marker, 'click', () => {
-          infowindow.open(map, marker);
-        });
-      });
-
-      // 自動調整視野邊界
-      if (itemsWithCoords.length > 1) {
-        map.setBounds(bounds);
-      } else if (itemsWithCoords.length === 1) {
-        map.setCenter(new kakao.maps.LatLng(itemsWithCoords[0].coords.latitude, itemsWithCoords[0].coords.longitude));
-      }
-
-      // 繪製路線折線
-      if (linePath.length > 1) {
-        const polyline = new kakao.maps.Polyline({
-          path: linePath,
-          strokeWeight: 4,
-          strokeColor: Colors.primary,
-          strokeOpacity: 0.8,
-          strokeStyle: 'solid'
-        });
-        polyline.setMap(map);
-        polylineRef.current = polyline;
-      }
+        if (linePath.length > 1) {
+          const polyline = new kakao.maps.Polyline({
+            path: linePath, strokeWeight: 4, strokeColor: Colors.primary, strokeOpacity: 0.8, strokeStyle: 'solid',
+          });
+          polyline.setMap(map);
+          polylineRef.current = polyline;
+        }
+      })();
     } catch (err: any) {
       console.error('Kakao Map initialization error:', err);
       setKakaoError(`地圖初始化失敗: ${err.message || err}`);
@@ -409,7 +416,11 @@ export default function MapScreen() {
       const name = extractPlaceFromKakaoUrl(url) || item.title;
       setQuery(name); setMapKey((k) => k + 1); return;
     }
-    const mapQuery = getMapQuery(item);
+    let mapQuery = getMapQuery(item);
+    // NAVER 格式（[NAVER 地图] … 網址）會回傳整串，清理成可搜尋的地名
+    if (/^\[/.test(mapQuery) || /https?:\/\//.test(mapQuery)) {
+      mapQuery = buildSearchQuery(item);
+    }
     setQuery(mapQuery);
     setMapKey((k) => k + 1);
   };
