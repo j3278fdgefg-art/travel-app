@@ -187,7 +187,7 @@ export default function ExpensesScreen() {
   const openAdd = () => {
     setEditingExpense(null);
     const ownerName = members.find((m) => m.role === 'owner')?.display_name || '';
-    setForm({ ...emptyForm(), paidBy: ownerName, sharedWith: ownerName ? [ownerName] : [] });
+    setForm({ ...emptyForm(), category: expenseCats[0] || '🍽️', paidBy: ownerName, sharedWith: ownerName ? [ownerName] : [] });
     setModalVisible(true);
   };
 

@@ -367,7 +367,7 @@ export default function ItineraryScreen() {
 
   const openAdd = () => {
     setEditingItem(null);
-    setForm(emptyForm());
+    setForm({ ...emptyForm(), type: itemTypes[0] || '📸' });
     setTimeHour(''); setTimeMin('');
     setLocationInput('');
     setUrlDetected(false);
@@ -386,6 +386,7 @@ export default function ItineraryScreen() {
 
   const openEdit = (item: ItineraryItem) => {
     setEditingItem(item);
+    setAddTab('manual');
     const [h = '', m = ''] = (item.time || '').split(':');
     setTimeHour(h); setTimeMin(m);
     setForm({
@@ -586,18 +587,16 @@ export default function ItineraryScreen() {
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
 
-            {!editingItem && (
-              <View style={styles.addTabs}>
-                <TouchableOpacity style={[styles.addTab, addTab === 'manual' && styles.addTabActive]} onPress={() => setAddTab('manual')}>
-                  <Text style={[styles.addTabText, addTab === 'manual' && styles.addTabTextActive]}>✏️ 手動輸入</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.addTab, addTab === 'favorite' && styles.addTabActive]} onPress={() => setAddTab('favorite')}>
-                  <Text style={[styles.addTabText, addTab === 'favorite' && styles.addTabTextActive]}>❤️ 收藏清單</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={styles.addTabs}>
+              <TouchableOpacity style={[styles.addTab, addTab === 'manual' && styles.addTabActive]} onPress={() => setAddTab('manual')}>
+                <Text style={[styles.addTabText, addTab === 'manual' && styles.addTabTextActive]}>✏️ 手動輸入</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addTab, addTab === 'favorite' && styles.addTabActive]} onPress={() => setAddTab('favorite')}>
+                <Text style={[styles.addTabText, addTab === 'favorite' && styles.addTabTextActive]}>❤️ 收藏清單</Text>
+              </TouchableOpacity>
+            </View>
 
-            {!editingItem && addTab === 'favorite' && (
+            {addTab === 'favorite' && (
               <View style={{ marginTop: 4 }}>
                 {favorites.length === 0 ? (
                   <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
@@ -614,7 +613,7 @@ export default function ItineraryScreen() {
               </View>
             )}
 
-            {(editingItem || addTab === 'manual') && (<>
+            {addTab === 'manual' && (<>
             <Text style={styles.label}>類型</Text>
             <View style={styles.typeRow}>
               {itemTypes.map((e) => (
@@ -711,7 +710,7 @@ export default function ItineraryScreen() {
             <TextInput style={[styles.input, { height: 72 }]} value={form.note} onChangeText={(v) => setField('note', v)} placeholder="..." placeholderTextColor={Colors.textLight} multiline />
             </>)}
 
-            {(editingItem || addTab === 'manual') && (
+            {addTab === 'manual' && (
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                   <Text style={styles.cancelText}>取消</Text>
