@@ -430,7 +430,9 @@ export default function ItineraryScreen() {
   };
 
   const openInMap = (item: ItineraryItem) => {
-    const q = getMapQuery(item);
+    // 新地圖用 Places textSearch，需要文字地名；把 location 的 URL 去掉，沒有就用標題
+    let q = (item.location || '').replace(/https?:\/\/\S+/g, '').replace(/[，,]\s*$/, '').trim();
+    if (!q) q = item.title;
     router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
 
