@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, useWindowDimensions,
+  SafeAreaView, Modal, TextInput, useWindowDimensions, Platform,
 } from 'react-native';
 import { useGlobalSearchParams, router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -201,6 +201,16 @@ function destFlag(dest: string): string {
   ];
   for (const [re, icon] of map) if (re.test(dest)) return icon;
   return '🧳';
+}
+
+// 垂直虛線（一點一點），可從 color 漸層到 toColor
+const DOT_MASK = 'repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 9px)';
+function DottedLine({ color, toColor }: { color: string; toColor?: string }) {
+  if (Platform.OS !== 'web') return <View style={{ flex: 1, width: 2, backgroundColor: color }} />;
+  const grad = `linear-gradient(${color}, ${toColor || color})`;
+  return (
+    <div style={{ width: 3, height: '100%', backgroundImage: grad, WebkitMaskImage: DOT_MASK, maskImage: DOT_MASK } as any} />
+  );
 }
 
 function typeEmoji(t: string) { return LEGACY_EMOJI[t] || t; }
@@ -483,6 +493,8 @@ export default function ItineraryScreen() {
           currentDayItems.map((item, idx) => {
             const isOpen = expandedItem === item.id;
             const next = currentDayItems[idx + 1];
+            const dotColor = emojiColor(typeEmoji(item.type));
+            const nextColor = next ? emojiColor(typeEmoji(next.type)) : dotColor;
             return (
               <View key={item.id}>
               <View style={styles.timelineRow}>
@@ -490,9 +502,9 @@ export default function ItineraryScreen() {
                   <Text style={styles.timeText}>{item.time}</Text>
                 </View>
                 <View style={styles.dotCol}>
-                  {idx > 0 && <View style={styles.lineTop} />}
-                  {idx < currentDayItems.length - 1 && <View style={styles.lineBottom} />}
-                  <View style={[styles.dot, { backgroundColor: emojiColor(typeEmoji(item.type)) }]} />
+                  <View style={styles.lineCell}>{idx > 0 ? <DottedLine color={dotColor} /> : null}</View>
+                  <View style={[styles.dot, { backgroundColor: dotColor }]} />
+                  <View style={styles.lineCell}>{next ? <DottedLine color={dotColor} /> : null}</View>
                 </View>
                 <View style={styles.itemCard}>
                   {/* 收合狀態：只有圖示 + 名稱 */}
@@ -548,7 +560,7 @@ export default function ItineraryScreen() {
               {next && (
                 <View style={styles.transitRow}>
                   <View style={{ width: 50 }} />
-                  <View style={styles.transitDotCol}><View style={styles.transitLine} /></View>
+                  <View style={styles.transitDotCol}><DottedLine color={dotColor} toColor={nextColor} /></View>
                   <TouchableOpacity style={styles.transitTouch} activeOpacity={0.7} onPress={() => openTransitEdit(next)}>
                     {next.transit_min ? (
                       <Text style={styles.transitText}>{next.transit_mode || '🚶'} {transitLabel(next.transit_mode)} {next.transit_min} 分</Text>
@@ -780,10 +792,9 @@ const styles = StyleSheet.create({
   timelineRow: { flexDirection: 'row' },
   timeCol: { width: 50, justifyContent: 'center' },
   timeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
-  dotCol: { width: 24, marginRight: 12, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  dotCol: { width: 24, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
+  lineCell: { flex: 1, width: 3, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#fff', zIndex: 1 },
-  lineTop: { position: 'absolute', top: 0, height: '50%', width: 2, left: '50%', marginLeft: -1, backgroundColor: Colors.border },
-  lineBottom: { position: 'absolute', bottom: 0, height: '50%', width: 2, left: '50%', marginLeft: -1, backgroundColor: Colors.border },
   itemCard: { flex: 1, backgroundColor: Colors.card, borderRadius: 14, padding: 14, marginVertical: 4, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemEmoji: { fontSize: 20 },
@@ -802,10 +813,9 @@ const styles = StyleSheet.create({
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
   itemBtnEmoji: { fontSize: 13 },
   itemBtnLabel: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
-  transitRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 4 },
+  transitRow: { flexDirection: 'row', alignItems: 'stretch' },
   transitDotCol: { width: 24, marginRight: 12, alignItems: 'center' },
-  transitLine: { width: 2, flex: 1, backgroundColor: Colors.border },
-  transitTouch: { flex: 1, justifyContent: 'center', paddingVertical: 8 },
+  transitTouch: { flex: 1, justifyContent: 'center', paddingVertical: 10 },
   transitText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
   transitAdd: { fontSize: 12, color: Colors.textLight },
   transitBox: { backgroundColor: Colors.card, borderRadius: 20, padding: 22, width: '88%', maxWidth: 360 },
