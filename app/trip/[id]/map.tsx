@@ -83,6 +83,9 @@ export default function MapScreen() {
     || currentTrip?.destination || currentTrip?.name || '釜山';
 
   const [search, setSearch] = useState('');
+  const [predictions, setPredictions] = useState<any[]>([]);
+  const acServiceRef = useRef<any>(null);
+  const acTimer = useRef<any>(null);
   const [query, setQuery] = useState(defaultQuery);
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -144,6 +147,7 @@ export default function MapScreen() {
           zoomControl: false,
         });
         placesRef.current = new google.maps.places.PlacesService(mapRef.current);
+        acServiceRef.current = new google.maps.places.AutocompleteService();
       }
       const map = mapRef.current;
 
@@ -223,7 +227,27 @@ export default function MapScreen() {
 
   const handleSearch = () => {
     const s = search.trim();
-    if (s) { setQuery(s); setMapKey((k) => k + 1); }
+    if (s) { setQuery(s); setMapKey((k) => k + 1); setPredictions([]); }
+  };
+
+  // 打字時取得 Google 地點建議（自動完成）
+  const onSearchChange = (t: string) => {
+    setSearch(t);
+    if (acTimer.current) clearTimeout(acTimer.current);
+    if (!t.trim() || !acServiceRef.current) { setPredictions([]); return; }
+    acTimer.current = setTimeout(() => {
+      acServiceRef.current.getPlacePredictions({ input: t }, (preds: any, status: any) => {
+        const g = (window as any).google;
+        setPredictions(status === g.maps.places.PlacesServiceStatus.OK && preds ? preds.slice(0, 5) : []);
+      });
+    }, 220);
+  };
+
+  const pickPrediction = (p: any) => {
+    setSearch(p.description);
+    setQuery(p.description);
+    setMapKey((k) => k + 1);
+    setPredictions([]);
   };
 
   // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
@@ -302,15 +326,27 @@ export default function MapScreen() {
 
         {/* 浮在地圖上的搜尋列 */}
         <View style={styles.searchRow}>
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="搜尋景點、地址..."
-            placeholderTextColor={Colors.textLight}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
+          <View style={{ flex: 1 }}>
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={onSearchChange}
+              placeholder="搜尋景點、地址..."
+              placeholderTextColor={Colors.textLight}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+            {predictions.length > 0 && (
+              <View style={styles.acDropdown}>
+                {predictions.map((p) => (
+                  <TouchableOpacity key={p.place_id} style={styles.acRow} onPress={() => pickPrediction(p)}>
+                    <Text style={styles.acIcon}>📍</Text>
+                    <Text style={styles.acText} numberOfLines={1}>{p.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnEmoji}>🔍</Text>
           </TouchableOpacity>
@@ -373,6 +409,10 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, height: 46, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 16, fontSize: 14, color: Colors.text, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   searchBtn: { width: 46, height: 46, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   searchBtnEmoji: { fontSize: 18 },
+  acDropdown: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  acRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  acIcon: { fontSize: 13 },
+  acText: { flex: 1, fontSize: 13, color: Colors.text },
   // 右側控制按鈕
   ctrlStack: { position: 'absolute', top: 70, right: 12, gap: 8, zIndex: 5 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
