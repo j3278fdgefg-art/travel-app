@@ -97,6 +97,7 @@ export default function MapScreen() {
   const acServiceRef = useRef<any>(null);
   const acTimer = useRef<any>(null);
   const [place, setPlace] = useState<any | null>(null);
+  const [placeCollapsed, setPlaceCollapsed] = useState(false);
   const [route, setRoute] = useState<any | null>(null);
   const [routeCollapsed, setRouteCollapsed] = useState(false);
   const [routing, setRouting] = useState(false);
@@ -335,6 +336,7 @@ export default function MapScreen() {
           author: r.author_name, rating: r.rating, text: r.text, time: r.relative_time_description,
         }));
         setRoute(null);
+        setPlaceCollapsed(false);
         setPlace({
           placeId, name: res.name, rating: res.rating, count: res.user_ratings_total,
           address: res.formatted_address, phone: res.formatted_phone_number,
@@ -654,9 +656,23 @@ export default function MapScreen() {
           )}
         </Animated.View>
 
-        {/* 店家完整資訊卡（點地圖店家 / 標記時跳出，不離開 App） */}
+        {/* 店家完整資訊卡（可收合，點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && (
           <View style={styles.sheet}>
+            {/* 標題列常駐 */}
+            <View style={styles.placeHeaderBar}>
+              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={placeCollapsed ? 1 : 2}>{place.name}</Text>
+              <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
+                <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setPlaceCollapsed((v) => !v)} style={styles.drawerClose}>
+                <Text style={styles.drawerCloseText}>{placeCollapsed ? '▴' : '▾'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={closePlace} style={[styles.drawerClose, { marginLeft: 6 }]}>
+                <Text style={styles.drawerCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {!placeCollapsed && (
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
               {place.photos?.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
@@ -666,15 +682,6 @@ export default function MapScreen() {
                 </ScrollView>
               )}
               <View style={styles.placeCardBody}>
-                <View style={styles.placeCardTop}>
-                  <Text style={styles.placeCardName} numberOfLines={2}>{place.name}</Text>
-                  <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
-                    <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={closePlace} style={styles.drawerClose}>
-                    <Text style={styles.drawerCloseText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
                 <View style={styles.placeMetaRow}>
                   {!!place.rating && <Text style={styles.placeMeta}>⭐ {place.rating}（{place.count || 0}）</Text>}
                   {!!place.type && <Text style={styles.placeMeta}>{placeTypeLabel(place.type)}</Text>}
@@ -719,6 +726,7 @@ export default function MapScreen() {
                 )}
               </View>
             </ScrollView>
+            )}
           </View>
         )}
 
@@ -798,7 +806,8 @@ const styles = StyleSheet.create({
   placeCat: { fontSize: 11, color: Colors.textSecondary },
   sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: '78%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
-  placeCardBody: { padding: 14 },
+  placeHeaderBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
+  placeCardBody: { paddingHorizontal: 14, paddingBottom: 14 },
   placeCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   favHeart: { padding: 4 },
   favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
