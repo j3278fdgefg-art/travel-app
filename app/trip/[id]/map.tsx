@@ -393,6 +393,12 @@ export default function MapScreen() {
     try { dirRendererRef.current?.setDirections({ routes: [] }); } catch {}
   };
 
+  // 關閉資訊卡（同時移除搜尋標記）
+  const closePlace = () => {
+    setPlace(null);
+    if (searchMarkerRef.current) { searchMarkerRef.current.setMap(null); searchMarkerRef.current = null; }
+  };
+
   // 收藏
   const findFav = (p: any) => favorites.find((f) => (p.placeId && f.place_id === p.placeId) || f.name === p.name);
   const toggleFav = (p: any) => {
@@ -614,7 +620,7 @@ export default function MapScreen() {
                   <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                     <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setPlace(null)} style={styles.drawerClose}>
+                  <TouchableOpacity onPress={closePlace} style={styles.drawerClose}>
                     <Text style={styles.drawerCloseText}>✕</Text>
                   </TouchableOpacity>
                 </View>
