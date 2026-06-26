@@ -40,6 +40,8 @@ export interface ItineraryItem {
   note: string;
   type: 'transport' | 'accommodation' | 'food' | 'attraction' | 'other';
   order_index: number;
+  transit_mode?: string;
+  transit_min?: number;
 }
 
 export interface Booking {

@@ -160,6 +160,16 @@ async function fetchWeather(destination: string, tripDates: string[] = []): Prom
   }
 }
 
+const TRANSIT_MODES: Array<{ emoji: string; label: string }> = [
+  { emoji: '🚶', label: '步行' },
+  { emoji: '🚌', label: '公車' },
+  { emoji: '🚇', label: '地鐵' },
+  { emoji: '🚗', label: '開車' },
+  { emoji: '🚕', label: '計程車' },
+  { emoji: '🚆', label: '火車' },
+];
+const transitLabel = (e?: string) => TRANSIT_MODES.find((m) => m.emoji === e)?.label || '交通';
+
 const DEFAULT_ITEM_TYPES = ['🏨', '🍽️', '📸'];
 const LEGACY_EMOJI: Record<string, string> = {
   transport: '🚗', accommodation: '🏨', food: '🍽️', attraction: '📸', other: '📌',
@@ -226,6 +236,9 @@ export default function ItineraryScreen() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [addTab, setAddTab] = useState<'manual' | 'favorite'>('manual');
+  const [transitItem, setTransitItem] = useState<ItineraryItem | null>(null);
+  const [transitMode, setTransitMode] = useState('🚶');
+  const [transitMin, setTransitMin] = useState('');
   const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [timeHour, setTimeHour] = useState('');
@@ -410,6 +423,23 @@ export default function ItineraryScreen() {
     router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
 
+  // 編輯兩個行程間的交通（存在「後一個」項目上）
+  const openTransitEdit = (toItem: ItineraryItem) => {
+    setTransitItem(toItem);
+    setTransitMode(toItem.transit_mode || '🚶');
+    setTransitMin(toItem.transit_min ? String(toItem.transit_min) : '');
+  };
+  const saveTransit = async () => {
+    if (!transitItem) return;
+    await updateItineraryItem(transitItem.id, { transit_mode: transitMode, transit_min: parseInt(transitMin) || 0 } as any);
+    setTransitItem(null);
+  };
+  const clearTransit = async () => {
+    if (!transitItem) return;
+    await updateItineraryItem(transitItem.id, { transit_mode: null, transit_min: null } as any);
+    setTransitItem(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
@@ -452,8 +482,10 @@ export default function ItineraryScreen() {
         ) : (
           currentDayItems.map((item, idx) => {
             const isOpen = expandedItem === item.id;
+            const next = currentDayItems[idx + 1];
             return (
-              <View key={item.id} style={styles.timelineRow}>
+              <View key={item.id}>
+              <View style={styles.timelineRow}>
                 <View style={styles.timeCol}>
                   <Text style={styles.timeText}>{item.time}</Text>
                 </View>
@@ -509,6 +541,18 @@ export default function ItineraryScreen() {
                     </View>
                   )}
                 </View>
+              </View>
+
+              {/* 兩個行程之間的交通時間 */}
+              {next && (
+                <TouchableOpacity style={styles.transitRow} activeOpacity={0.7} onPress={() => openTransitEdit(next)}>
+                  {next.transit_min ? (
+                    <Text style={styles.transitText}>{next.transit_mode || '🚶'} {transitLabel(next.transit_mode)} {next.transit_min} 分</Text>
+                  ) : (
+                    <Text style={styles.transitAdd}>＋ 加交通時間</Text>
+                  )}
+                </TouchableOpacity>
+              )}
               </View>
             );
           })
@@ -664,6 +708,50 @@ export default function ItineraryScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 交通時間編輯 */}
+      <Modal visible={!!transitItem} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.transitBox}>
+            <Text style={styles.modalTitle}>交通時間</Text>
+            <Text style={styles.transitToLabel}>到「{transitItem?.title}」</Text>
+            <View style={styles.transitModeGrid}>
+              {TRANSIT_MODES.map((m) => (
+                <TouchableOpacity
+                  key={m.emoji}
+                  style={[styles.transitModeBtn, transitMode === m.emoji && styles.transitModeBtnSel]}
+                  onPress={() => setTransitMode(m.emoji)}
+                >
+                  <Text style={{ fontSize: 22 }}>{m.emoji}</Text>
+                  <Text style={[styles.transitModeText, transitMode === m.emoji && { color: '#fff' }]}>{m.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.label}>分鐘</Text>
+            <TextInput
+              style={styles.input}
+              value={transitMin}
+              onChangeText={(v) => setTransitMin(v.replace(/\D/g, '').slice(0, 3))}
+              placeholder="例：15"
+              placeholderTextColor={Colors.textLight}
+              keyboardType="numeric"
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setTransitItem(null)}>
+                <Text style={styles.cancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.createBtn} onPress={saveTransit}>
+                <Text style={styles.createText}>儲存</Text>
+              </TouchableOpacity>
+            </View>
+            {!!transitItem?.transit_min && (
+              <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 8 }} onPress={clearTransit}>
+                <Text style={{ color: Colors.danger, fontSize: 13 }}>清除交通時間</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -708,6 +796,15 @@ const styles = StyleSheet.create({
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
   itemBtnEmoji: { fontSize: 13 },
   itemBtnLabel: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
+  transitRow: { paddingLeft: 86, paddingVertical: 4, marginBottom: 4 },
+  transitText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  transitAdd: { fontSize: 12, color: Colors.textLight },
+  transitBox: { backgroundColor: Colors.card, borderRadius: 20, padding: 22, width: '88%', maxWidth: 360 },
+  transitToLabel: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 14 },
+  transitModeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  transitModeBtn: { width: 88, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', gap: 2 },
+  transitModeBtnSel: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  transitModeText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
   emptyDay: { alignItems: 'center', marginTop: 80 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },
