@@ -574,8 +574,13 @@ export default function MapScreen() {
           )}
         </View>
 
-        {/* 右側控制：收藏、清單、定位、導航 */}
+        {/* 右側控制：資訊卡收合、收藏、清單、定位、導航 */}
         <View style={styles.ctrlStack}>
+          {place && (
+            <TouchableOpacity style={[styles.ctrlBtn, placeCollapsed && styles.ctrlBtnDim]} onPress={() => setPlaceCollapsed((v) => !v)}>
+              <Text style={styles.ctrlBtnEmoji}>ℹ️</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.ctrlBtn, showFav && styles.ctrlBtnActive]} onPress={() => { setShowFav((v) => !v); setShowPanel(false); }}>
             <Text style={styles.ctrlBtnEmoji}>{showFav ? '❤️' : '🤍'}</Text>
           </TouchableOpacity>
@@ -664,9 +669,6 @@ export default function MapScreen() {
               <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={placeCollapsed ? 1 : 2}>{place.name}</Text>
               <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                 <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setPlaceCollapsed((v) => !v)} style={styles.drawerClose}>
-                <Text style={styles.drawerCloseText}>{placeCollapsed ? '▴' : '▾'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={closePlace} style={[styles.drawerClose, { marginLeft: 6 }]}>
                 <Text style={styles.drawerCloseText}>✕</Text>
