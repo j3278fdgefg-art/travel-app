@@ -661,12 +661,12 @@ export default function MapScreen() {
           )}
         </Animated.View>
 
-        {/* 店家完整資訊卡（可收合，點地圖店家 / 標記時跳出，不離開 App） */}
-        {place && !route && (
+        {/* 店家完整資訊卡（收合時整張隱藏，靠右側 ℹ️ 展開；點地圖店家 / 標記時跳出，不離開 App） */}
+        {place && !route && !placeCollapsed && (
           <View style={styles.sheet}>
             {/* 標題列常駐 */}
             <View style={styles.placeHeaderBar}>
-              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={placeCollapsed ? 1 : 2}>{place.name}</Text>
+              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
               <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                 <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
               </TouchableOpacity>
@@ -674,7 +674,6 @@ export default function MapScreen() {
                 <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            {!placeCollapsed && (
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
               {place.photos?.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
@@ -728,7 +727,6 @@ export default function MapScreen() {
                 )}
               </View>
             </ScrollView>
-            )}
           </View>
         )}
 
