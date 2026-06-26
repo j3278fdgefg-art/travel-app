@@ -598,7 +598,7 @@ export default function MapScreen() {
             {locating ? <ActivityIndicator size="small" color={Colors.primary} /> : <Text style={styles.ctrlBtnEmoji}>📍</Text>}
           </TouchableOpacity>
           <TouchableOpacity style={styles.ctrlBtn} onPress={navigateToQuery}>
-            <Text style={styles.ctrlBtnEmoji}>🧭</Text>
+            <Text style={[styles.ctrlBtnEmoji, { color: Colors.primary, fontWeight: '700' }]}>↗</Text>
           </TouchableOpacity>
         </View>
 
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   acName: { fontSize: 14, color: Colors.text, fontWeight: '500' },
   acAddr: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
   // 右側控制按鈕
-  ctrlStack: { position: 'absolute', top: 86, right: 14, gap: 8, zIndex: 5 },
+  ctrlStack: { position: 'absolute', top: 86, right: 14, gap: 8, zIndex: 9 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   ctrlBtnActive: { backgroundColor: Colors.primary },
   ctrlBtnDim: { opacity: 0.55 },
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
-  sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: '78%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  sheet: { position: 'absolute', bottom: 14, left: 12, right: 68, maxHeight: '78%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
   placeHeaderBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
   placeCardBody: { paddingHorizontal: 14, paddingBottom: 14 },
