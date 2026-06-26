@@ -438,12 +438,37 @@ export default function MapScreen() {
     window.location.href = scheme;
   };
 
-  // 點地點卡片 → 地圖移過去（並更新搜尋框與導航目標）
-  const showOnMap = (item: ItineraryItem) => {
-    const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
-    setQuery(coords ? `${coords.latitude},${coords.longitude}` : buildSearchQuery(item));
+  // 在地圖放標記並平移（無 place_id 時用座標）
+  const markAt = (lat: number, lng: number, label?: string) => {
+    const g = (window as any).google;
+    if (!g || !mapRef.current) { setQuery(`${lat},${lng}`); setMapKey((k) => k + 1); return; }
+    if (searchMarkerRef.current) searchMarkerRef.current.setMap(null);
+    searchMarkerRef.current = new g.maps.Marker({ position: { lat, lng }, map: mapRef.current, animation: g.maps.Animation.DROP, title: label });
+    mapRef.current.panTo({ lat, lng });
+    mapRef.current.setZoom(16);
+  };
+
+  // 點行程地點 → 放標記 + 跳資訊卡（跟搜尋一樣）
+  const showOnMap = async (item: ItineraryItem) => {
+    setShowPanel(false);
     setSearch(item.title);
-    setMapKey((k) => k + 1);
+    if (!placesRef.current) {
+      const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
+      setQuery(coords ? `${coords.latitude},${coords.longitude}` : buildSearchQuery(item));
+      setMapKey((k) => k + 1);
+      return;
+    }
+    const c = await resolveItemCoords(item, placesRef.current);
+    if (c?.placeId) { showPlaceDetails(c.placeId); return; }
+    if (c) { markAt(c.latitude, c.longitude, item.title); return; }
+    setQuery(buildSearchQuery(item)); setMapKey((k) => k + 1);
+  };
+
+  // 點收藏 → 放標記 + 跳資訊卡
+  const showFavOnMap = (f: any) => {
+    setShowFav(false);
+    if (f.place_id && placesRef.current) { showPlaceDetails(f.place_id); return; }
+    if (f.lat != null && f.lng != null) { markAt(f.lat, f.lng, f.name); }
   };
 
   const isCoord = /^-?\d+\.\d+,-?\d+\.\d+$/.test(query);
@@ -597,7 +622,7 @@ export default function MapScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
               {favorites.map((f) => (
                 <View key={f.id} style={styles.placeRow}>
-                  <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => { if (f.lat != null && f.lng != null) { setQuery(`${f.lat},${f.lng}`); setMapKey((k) => k + 1); } setShowFav(false); }}>
+                  <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => showFavOnMap(f)}>
                     <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
                     {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
                   </TouchableOpacity>
