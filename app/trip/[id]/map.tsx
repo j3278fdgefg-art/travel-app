@@ -679,7 +679,7 @@ export default function MapScreen() {
                 <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
               {place.photos?.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
                   {place.photos.map((url: string, i: number) => (
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
-  sheet: { position: 'absolute', bottom: 14, left: 12, right: 68, maxHeight: '78%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  sheet: { position: 'absolute', top: 76, bottom: 14, left: 12, right: 68, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
   placeHeaderBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
   placeCardBody: { paddingHorizontal: 14, paddingBottom: 14 },

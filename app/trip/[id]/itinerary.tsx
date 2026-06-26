@@ -538,12 +538,16 @@ export default function ItineraryScreen() {
                           </View>
                         );
                       })()}
+                      {item.note ? (
+                        <View style={styles.noteBox}>
+                          <Text style={styles.noteText}>📝 {item.note}</Text>
+                        </View>
+                      ) : null}
                       {item.location ? (
-                        <TouchableOpacity onPress={() => openInMap(item)}>
-                          <Text style={styles.itemLocation}>📍 {item.location} <Text style={styles.mapLink}>在地圖查看 →</Text></Text>
+                        <TouchableOpacity style={styles.mapBtn} onPress={() => openInMap(item)}>
+                          <Text style={styles.mapBtnText}>🗺️ 在地圖查看</Text>
                         </TouchableOpacity>
                       ) : null}
-                      {item.note ? <Text style={styles.itemNote}>{item.note}</Text> : null}
                       <View style={styles.itemBtns}>
                         <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
                           <Text style={styles.itemBtnEmoji}>✏️</Text>
@@ -809,6 +813,10 @@ const styles = StyleSheet.create({
   itemLocation: { fontSize: 12, color: Colors.textSecondary },
   mapLink: { color: Colors.primary, fontWeight: '500' },
   itemNote: { fontSize: 12, color: Colors.textLight, marginTop: 6 },
+  noteBox: { backgroundColor: Colors.background, borderRadius: 8, padding: 8, marginTop: 8 },
+  noteText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
+  mapBtn: { marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.primary, alignSelf: 'flex-start' },
+  mapBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
   itemBtns: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'flex-end' },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
