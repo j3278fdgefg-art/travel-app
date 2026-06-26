@@ -98,6 +98,7 @@ export default function MapScreen() {
   const acTimer = useRef<any>(null);
   const [place, setPlace] = useState<any | null>(null);
   const [route, setRoute] = useState<any | null>(null);
+  const [routeCollapsed, setRouteCollapsed] = useState(false);
   const [routing, setRouting] = useState(false);
   const dirServiceRef = useRef<any>(null);
   const dirRendererRef = useRef<any>(null);
@@ -125,6 +126,8 @@ export default function MapScreen() {
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
+  const drawGenRef = useRef(0);
+  const showRouteRef = useRef(true);
 
   const locationItems = items.filter((item) => item.location?.trim());
 
@@ -180,6 +183,7 @@ export default function MapScreen() {
         });
       }
       const map = mapRef.current;
+      const gen = ++drawGenRef.current; // 防止非同步重入造成重疊孤兒線
 
       // 清除舊標記/路線
       markersRef.current.forEach((m) => m.setMap(null));
@@ -189,10 +193,12 @@ export default function MapScreen() {
       (async () => {
         const resolved: Array<{ item: ItineraryItem; lat: number; lng: number; placeId?: string }> = [];
         for (const item of locationItems) {
+          if (drawGenRef.current !== gen) return; // 已有更新的繪製，放棄這批
           const c = await resolveItemCoords(item, placesRef.current);
           if (c) resolved.push({ item, lat: c.latitude, lng: c.longitude, placeId: c.placeId });
         }
-        if (mapRef.current !== map) return;
+        if (drawGenRef.current !== gen || mapRef.current !== map) return;
+        const visMap = showRouteRef.current ? map : null;
 
         const bounds = new google.maps.LatLngBounds();
         const path: any[] = [];
@@ -202,7 +208,7 @@ export default function MapScreen() {
           bounds.extend(position);
           path.push(position);
           const marker = new google.maps.Marker({
-            position, map: showRoute ? map : null, label: { text: String(idx + 1), color: '#fff', fontSize: '12px', fontWeight: '700' },
+            position, map: visMap, label: { text: String(idx + 1), color: '#fff', fontSize: '12px', fontWeight: '700' },
             title: item.title,
           });
           marker.addListener('click', () => {
@@ -217,7 +223,7 @@ export default function MapScreen() {
         if (resolved.length > 1) {
           map.fitBounds(bounds);
           polylineRef.current = new google.maps.Polyline({
-            path, map: showRoute ? map : null, strokeColor: Colors.primary, strokeOpacity: 0.85, strokeWeight: 4,
+            path, map: visMap, strokeColor: Colors.primary, strokeOpacity: 0.85, strokeWeight: 4,
           });
         } else if (resolved.length === 1) {
           map.setCenter(path[0]); map.setZoom(15);
@@ -230,6 +236,7 @@ export default function MapScreen() {
 
   // 切換行程標記/路線顯示（標記、行程綠線、導航路線都一起）
   useEffect(() => {
+    showRouteRef.current = showRoute;
     const m = showRoute ? mapRef.current : null;
     markersRef.current.forEach((mk) => mk.setMap(m));
     polylineRef.current?.setMap(m);
@@ -334,6 +341,7 @@ export default function MapScreen() {
             dirRendererRef.current.setMap(mapRef.current);
             dirRendererRef.current.setDirections(result);
             const leg = result.routes[0].legs[0];
+            setRouteCollapsed(false);
             setRoute({
               mode, dest,
               distance: leg.distance?.text, duration: leg.duration?.text,
@@ -637,32 +645,39 @@ export default function MapScreen() {
           </View>
         )}
 
-        {/* App 內路線面板 */}
+        {/* App 內路線面板（可收合，不擋地圖） */}
         {route && (
           <View style={styles.sheet}>
             <View style={styles.routeHeader}>
               <Text style={styles.routeSummary}>{route.duration} · {route.distance}</Text>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity onPress={clearRoute} style={styles.drawerClose}>
+              <TouchableOpacity onPress={() => setRouteCollapsed((v) => !v)} style={styles.drawerClose}>
+                <Text style={styles.drawerCloseText}>{routeCollapsed ? '▴' : '▾'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={clearRoute} style={[styles.drawerClose, { marginLeft: 6 }]}>
                 <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.modeTabs}>
-              {(['WALKING', 'DRIVING', 'TRANSIT'] as const).map((m) => (
-                <TouchableOpacity key={m} style={[styles.modeTab, route.mode === m && styles.modeTabActive]} onPress={() => computeRoute(route.dest, m)}>
-                  <Text style={[styles.modeTabText, route.mode === m && styles.modeTabTextActive]}>{m === 'WALKING' ? '🚶 走路' : m === 'DRIVING' ? '🚗 開車' : '🚌 大眾運輸'}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
-              {route.steps.map((s: any, i: number) => (
-                <View key={i} style={styles.stepRow}>
-                  <Text style={styles.stepNum}>{i + 1}</Text>
-                  <Text style={styles.stepInstr}>{s.instr}</Text>
-                  {!!s.dist && <Text style={styles.stepDist}>{s.dist}</Text>}
+            {!routeCollapsed && (
+              <>
+                <View style={styles.modeTabs}>
+                  {(['WALKING', 'DRIVING', 'TRANSIT'] as const).map((m) => (
+                    <TouchableOpacity key={m} style={[styles.modeTab, route.mode === m && styles.modeTabActive]} onPress={() => computeRoute(route.dest, m)}>
+                      <Text style={[styles.modeTabText, route.mode === m && styles.modeTabTextActive]}>{m === 'WALKING' ? '🚶 走路' : m === 'DRIVING' ? '🚗 開車' : '🚌 大眾運輸'}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              ))}
-            </ScrollView>
+                <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+                  {route.steps.map((s: any, i: number) => (
+                    <View key={i} style={styles.stepRow}>
+                      <Text style={styles.stepNum}>{i + 1}</Text>
+                      <Text style={styles.stepInstr}>{s.instr}</Text>
+                      {!!s.dist && <Text style={styles.stepDist}>{s.dist}</Text>}
+                    </View>
+                  ))}
+                </ScrollView>
+              </>
+            )}
           </View>
         )}
       </View>
