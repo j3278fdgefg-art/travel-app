@@ -128,6 +128,7 @@ export default function MapScreen() {
   const placesRef = useRef<any>(null);
   const drawGenRef = useRef(0);
   const showRouteRef = useRef(true);
+  const searchMarkerRef = useRef<any>(null);
 
   const locationItems = items.filter((item) => item.location?.trim());
 
@@ -274,7 +275,17 @@ export default function MapScreen() {
 
   const handleSearch = () => {
     const s = search.trim();
-    if (s) { setQuery(s); setMapKey((k) => k + 1); setPredictions([]); }
+    if (!s) return;
+    setPredictions([]);
+    if (placesRef.current) {
+      // 搜尋到地點 → 放標記 + 跳資訊卡
+      googleTextSearch(placesRef.current, s).then((c) => {
+        if (c?.placeId) showPlaceDetails(c.placeId);
+        else { setQuery(s); setMapKey((k) => k + 1); }
+      });
+    } else {
+      setQuery(s); setMapKey((k) => k + 1); // 無金鑰退回內嵌地圖
+    }
   };
 
   // 打字時取得 Google 地點建議（自動完成）
@@ -292,9 +303,12 @@ export default function MapScreen() {
 
   const pickPrediction = (p: any) => {
     setSearch(p.description);
-    setQuery(p.description);
-    setMapKey((k) => k + 1);
     setPredictions([]);
+    if (p.place_id && placesRef.current) {
+      showPlaceDetails(p.place_id); // 放標記 + 跳資訊卡 + 移動地圖
+    } else {
+      setQuery(p.description); setMapKey((k) => k + 1);
+    }
   };
 
   // 取得店家詳細資訊，在 App 內顯示
@@ -322,7 +336,13 @@ export default function MapScreen() {
           type: res.types?.[0], photos, website: res.website, reviews,
           lat: loc ? loc.lat() : undefined, lng: loc ? loc.lng() : undefined,
         });
-        if (loc && mapRef.current) mapRef.current.panTo(loc);
+        // 在地圖上放一個標記標出這個地點
+        if (loc && mapRef.current) {
+          if (searchMarkerRef.current) searchMarkerRef.current.setMap(null);
+          searchMarkerRef.current = new g.maps.Marker({ position: loc, map: mapRef.current, animation: g.maps.Animation.DROP });
+          mapRef.current.panTo(loc);
+          mapRef.current.setZoom(16);
+        }
       }
     );
   };
