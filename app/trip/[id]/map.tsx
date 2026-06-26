@@ -19,6 +19,14 @@ const TYPE_META: Record<string, { emoji: string; label: string }> = {
 };
 const typeMeta = (t?: string) => TYPE_META[t || 'other'] || { emoji: t || '📍', label: '地點' };
 
+const PLACE_TYPE_ZH: Record<string, string> = {
+  restaurant: '餐廳', cafe: '咖啡廳', food: '美食', bar: '酒吧', bakery: '烘焙坊',
+  lodging: '住宿', tourist_attraction: '景點', store: '商店', shopping_mall: '購物中心',
+  convenience_store: '便利商店', park: '公園', subway_station: '地鐵站', train_station: '車站',
+  museum: '博物館', spa: 'SPA', amusement_park: '遊樂園', supermarket: '超市', department_store: '百貨',
+};
+const placeTypeLabel = (t?: string) => (t ? PLACE_TYPE_ZH[t] || t.replace(/_/g, ' ') : '');
+
 // 由 location 字串擷取可搜尋的地名/地址（去掉「[NAVER 地图]」前綴與網址）
 function buildSearchQuery(item: { location?: string; title: string }): string {
   let loc = (item.location || '').trim();
@@ -46,8 +54,10 @@ function loadGoogleMaps(key: string): Promise<void> {
   return googleScriptPromise;
 }
 
-// Google 地點文字搜尋 → 座標
-function googleTextSearch(service: any, query: string): Promise<{ latitude: number; longitude: number } | null> {
+type GeoHit = { latitude: number; longitude: number; placeId?: string };
+
+// Google 地點文字搜尋 → 座標 + place_id
+function googleTextSearch(service: any, query: string): Promise<GeoHit | null> {
   return new Promise((resolve) => {
     if (!query || !service) return resolve(null);
     try {
@@ -55,14 +65,14 @@ function googleTextSearch(service: any, query: string): Promise<{ latitude: numb
         const g = (window as any).google;
         if (status === g.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry?.location) {
           const loc = results[0].geometry.location;
-          resolve({ latitude: loc.lat(), longitude: loc.lng() });
+          resolve({ latitude: loc.lat(), longitude: loc.lng(), placeId: results[0].place_id });
         } else resolve(null);
       });
     } catch { resolve(null); }
   });
 }
 
-async function resolveItemCoords(item: ItineraryItem, service: any): Promise<{ latitude: number; longitude: number } | null> {
+async function resolveItemCoords(item: ItineraryItem, service: any): Promise<GeoHit | null> {
   const fromUrl = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
   if (fromUrl) return fromUrl;
   for (const q of [buildSearchQuery(item), item.title].filter(Boolean)) {
@@ -86,6 +96,7 @@ export default function MapScreen() {
   const [predictions, setPredictions] = useState<any[]>([]);
   const acServiceRef = useRef<any>(null);
   const acTimer = useRef<any>(null);
+  const [place, setPlace] = useState<any | null>(null);
   const [query, setQuery] = useState(defaultQuery);
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -148,6 +159,10 @@ export default function MapScreen() {
         });
         placesRef.current = new google.maps.places.PlacesService(mapRef.current);
         acServiceRef.current = new google.maps.places.AutocompleteService();
+        // 點地圖上任何店家 POI → 在 App 內顯示店家資訊（不跳 Google 地圖）
+        mapRef.current.addListener('click', (e: any) => {
+          if (e.placeId) { e.stop(); showPlaceDetails(e.placeId); }
+        });
       }
       const map = mapRef.current;
 
@@ -157,17 +172,17 @@ export default function MapScreen() {
       if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
 
       (async () => {
-        const resolved: Array<{ item: ItineraryItem; lat: number; lng: number }> = [];
+        const resolved: Array<{ item: ItineraryItem; lat: number; lng: number; placeId?: string }> = [];
         for (const item of locationItems) {
           const c = await resolveItemCoords(item, placesRef.current);
-          if (c) resolved.push({ item, lat: c.latitude, lng: c.longitude });
+          if (c) resolved.push({ item, lat: c.latitude, lng: c.longitude, placeId: c.placeId });
         }
         if (mapRef.current !== map) return;
 
         const bounds = new google.maps.LatLngBounds();
         const path: any[] = [];
         const infowindow = new google.maps.InfoWindow();
-        resolved.forEach(({ item, lat, lng }, idx) => {
+        resolved.forEach(({ item, lat, lng, placeId }, idx) => {
           const position = { lat, lng };
           bounds.extend(position);
           path.push(position);
@@ -176,6 +191,8 @@ export default function MapScreen() {
             title: item.title,
           });
           marker.addListener('click', () => {
+            // 有 place_id → 顯示完整店家資訊；否則顯示名稱
+            if (placeId) { showPlaceDetails(placeId); return; }
             infowindow.setContent(`<div style="font-size:13px;font-weight:600;color:#2C2C2C;padding:2px 4px;">${idx + 1}. ${item.title}</div>`);
             infowindow.open(map, marker);
           });
@@ -248,6 +265,29 @@ export default function MapScreen() {
     setQuery(p.description);
     setMapKey((k) => k + 1);
     setPredictions([]);
+  };
+
+  // 取得店家詳細資訊，在 App 內顯示
+  const showPlaceDetails = (placeId: string) => {
+    if (!placesRef.current || !placeId) return;
+    placesRef.current.getDetails(
+      { placeId, fields: ['name', 'rating', 'user_ratings_total', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'types', 'photos', 'geometry'] },
+      (res: any, status: any) => {
+        const g = (window as any).google;
+        if (status !== g.maps.places.PlacesServiceStatus.OK || !res) return;
+        let photoUrl = '';
+        try { if (res.photos?.[0]) photoUrl = res.photos[0].getUrl({ maxWidth: 480, maxHeight: 260 }); } catch {}
+        let openNow: boolean | undefined;
+        try { openNow = res.opening_hours?.isOpen?.(); } catch {}
+        if (openNow === undefined) openNow = res.opening_hours?.open_now;
+        setPlace({
+          name: res.name, rating: res.rating, count: res.user_ratings_total,
+          address: res.formatted_address, phone: res.formatted_phone_number,
+          openNow, type: res.types?.[0], photoUrl,
+        });
+        if (res.geometry?.location && mapRef.current) mapRef.current.panTo(res.geometry.location);
+      }
+    );
   };
 
   // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
@@ -396,6 +436,34 @@ export default function MapScreen() {
             })}
           </ScrollView>
         </Animated.View>
+
+        {/* 店家資訊卡（點地圖店家 / 標記時跳出，不離開 App） */}
+        {place && (
+          <View style={styles.placeCard}>
+            {!!place.photoUrl && (
+              <img src={place.photoUrl} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+            )}
+            <View style={styles.placeCardBody}>
+              <View style={styles.placeCardTop}>
+                <Text style={styles.placeCardName} numberOfLines={2}>{place.name}</Text>
+                <TouchableOpacity onPress={() => setPlace(null)} style={styles.drawerClose}>
+                  <Text style={styles.drawerCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.placeMetaRow}>
+                {!!place.rating && <Text style={styles.placeMeta}>⭐ {place.rating}（{place.count || 0}）</Text>}
+                {!!place.type && <Text style={styles.placeMeta}>{placeTypeLabel(place.type)}</Text>}
+                {place.openNow !== undefined && (
+                  <Text style={[styles.placeMeta, { color: place.openNow ? Colors.success : Colors.danger, fontWeight: '700' }]}>
+                    {place.openNow ? '營業中' : '休息中'}
+                  </Text>
+                )}
+              </View>
+              {!!place.address && <Text style={styles.placeAddr}>📍 {place.address}</Text>}
+              {!!place.phone && <Text style={styles.placeAddr}>📞 {place.phone}</Text>}
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -432,6 +500,13 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
+  placeCard: { position: 'absolute', bottom: 14, left: 12, right: 12, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  placeCardBody: { padding: 14 },
+  placeCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  placeCardName: { flex: 1, fontSize: 17, fontWeight: '700', color: Colors.text },
+  placeMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  placeMeta: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  placeAddr: { fontSize: 13, color: Colors.textSecondary, marginTop: 8, lineHeight: 19 },
   keyHint: { position: 'absolute', bottom: 14, left: 12, right: 12, backgroundColor: 'rgba(44,44,44,0.82)', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, zIndex: 4 },
   keyHintText: { color: '#fff', fontSize: 12, textAlign: 'center', fontWeight: '500' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EAE7DF' },
