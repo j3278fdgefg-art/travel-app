@@ -107,6 +107,7 @@ export default function MapScreen() {
   const [showPanel, setShowPanel] = useState(false);
 
   const [showFav, setShowFav] = useState(false);
+  const [showRoute, setShowRoute] = useState(true);
   const DRAWER_W = 290;
   const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
   const favX = useRef(new Animated.Value(DRAWER_W)).current;
@@ -201,7 +202,7 @@ export default function MapScreen() {
           bounds.extend(position);
           path.push(position);
           const marker = new google.maps.Marker({
-            position, map, label: { text: String(idx + 1), color: '#fff', fontSize: '12px', fontWeight: '700' },
+            position, map: showRoute ? map : null, label: { text: String(idx + 1), color: '#fff', fontSize: '12px', fontWeight: '700' },
             title: item.title,
           });
           marker.addListener('click', () => {
@@ -216,7 +217,7 @@ export default function MapScreen() {
         if (resolved.length > 1) {
           map.fitBounds(bounds);
           polylineRef.current = new google.maps.Polyline({
-            path, map, strokeColor: Colors.primary, strokeOpacity: 0.85, strokeWeight: 4,
+            path, map: showRoute ? map : null, strokeColor: Colors.primary, strokeOpacity: 0.85, strokeWeight: 4,
           });
         } else if (resolved.length === 1) {
           map.setCenter(path[0]); map.setZoom(15);
@@ -226,6 +227,12 @@ export default function MapScreen() {
       setGError(true);
     }
   }, [gLoaded, items, currentTrip]);
+
+  // 切換行程標記/路線顯示
+  useEffect(() => {
+    markersRef.current.forEach((m) => m.setMap(showRoute ? mapRef.current : null));
+    if (polylineRef.current) polylineRef.current.setMap(showRoute ? mapRef.current : null);
+  }, [showRoute]);
 
   // query 改變 → 平移地圖（點地點卡片 / 定位）
   useEffect(() => {
@@ -285,7 +292,7 @@ export default function MapScreen() {
   const showPlaceDetails = (placeId: string) => {
     if (!placesRef.current || !placeId) return;
     placesRef.current.getDetails(
-      { placeId, fields: ['name', 'rating', 'user_ratings_total', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'types', 'photos', 'geometry', 'website'] },
+      { placeId, fields: ['name', 'rating', 'user_ratings_total', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'types', 'photos', 'geometry', 'website', 'reviews'] },
       (res: any, status: any) => {
         const g = (window as any).google;
         if (status !== g.maps.places.PlacesServiceStatus.OK || !res) return;
@@ -295,12 +302,15 @@ export default function MapScreen() {
         try { openNow = res.opening_hours?.isOpen?.(); } catch {}
         if (openNow === undefined) openNow = res.opening_hours?.open_now;
         const loc = res.geometry?.location;
+        const reviews = (res.reviews || []).slice(0, 4).map((r: any) => ({
+          author: r.author_name, rating: r.rating, text: r.text, time: r.relative_time_description,
+        }));
         setRoute(null);
         setPlace({
           placeId, name: res.name, rating: res.rating, count: res.user_ratings_total,
           address: res.formatted_address, phone: res.formatted_phone_number,
           openNow, weekday: res.opening_hours?.weekday_text || [],
-          type: res.types?.[0], photos, website: res.website,
+          type: res.types?.[0], photos, website: res.website, reviews,
           lat: loc ? loc.lat() : undefined, lng: loc ? loc.lng() : undefined,
         });
         if (loc && mapRef.current) mapRef.current.panTo(loc);
@@ -374,7 +384,7 @@ export default function MapScreen() {
       window.location.href = `google.navigation:q=${enc}`;
       setTimeout(() => { window.location.href = webUrl; }, 1200);
     } else {
-      window.open(webUrl, '_blank');
+      window.open(webUrl, 'travelExt');
     }
   };
 
@@ -473,6 +483,11 @@ export default function MapScreen() {
           {locationItems.length > 0 && (
             <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => { setShowPanel((v) => !v); setShowFav(false); }}>
               <Text style={styles.ctrlBtnEmoji}>📋</Text>
+            </TouchableOpacity>
+          )}
+          {locationItems.length > 0 && (
+            <TouchableOpacity style={[styles.ctrlBtn, !showRoute && styles.ctrlBtnDim]} onPress={() => setShowRoute((v) => !v)}>
+              <Text style={styles.ctrlBtnEmoji}>{showRoute ? '🛣️' : '🚫'}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.ctrlBtn} onPress={handleLocate} disabled={locating}>
@@ -583,11 +598,26 @@ export default function MapScreen() {
                 {!!place.address && <Text style={styles.placeAddr}>📍 {place.address}</Text>}
                 {!!place.phone && <Text style={styles.placeAddr}>📞 {place.phone}</Text>}
                 {!!place.website && (
-                  <Text style={styles.placeLink} onPress={() => window.open(place.website, '_blank')} numberOfLines={1}>🌐 {place.website}</Text>
+                  <Text style={styles.placeLink} onPress={() => window.open(place.website, 'travelExt')} numberOfLines={1}>🌐 {place.website}</Text>
                 )}
                 {place.weekday?.length > 0 && (
                   <View style={styles.hoursBox}>
                     {place.weekday.map((d: string, i: number) => <Text key={i} style={styles.hoursLine}>{d}</Text>)}
+                  </View>
+                )}
+                {place.reviews?.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={styles.reviewsTitle}>評論</Text>
+                    {place.reviews.map((r: any, i: number) => (
+                      <View key={i} style={styles.reviewItem}>
+                        <View style={styles.reviewTop}>
+                          <Text style={styles.reviewAuthor} numberOfLines={1}>{r.author}</Text>
+                          <Text style={styles.reviewRating}>{'⭐'.repeat(Math.round(r.rating || 0))}</Text>
+                          {!!r.time && <Text style={styles.reviewTime}>{r.time}</Text>}
+                        </View>
+                        {!!r.text && <Text style={styles.reviewText}>{r.text}</Text>}
+                      </View>
+                    ))}
                   </View>
                 )}
               </View>
@@ -645,6 +675,7 @@ const styles = StyleSheet.create({
   ctrlStack: { position: 'absolute', top: 86, right: 14, gap: 8, zIndex: 5 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   ctrlBtnActive: { backgroundColor: Colors.primary },
+  ctrlBtnDim: { opacity: 0.55 },
   ctrlBtnEmoji: { fontSize: 18 },
   // 右側滑出抽屜
   drawer: { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: Colors.background, paddingHorizontal: 12, paddingTop: 12, zIndex: 6, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: -4, height: 0 }, elevation: 8 },
@@ -674,6 +705,13 @@ const styles = StyleSheet.create({
   placeLink: { fontSize: 13, color: Colors.info, marginTop: 8 },
   hoursBox: { marginTop: 10, backgroundColor: Colors.background, borderRadius: 10, padding: 10, gap: 2 },
   hoursLine: { fontSize: 12, color: Colors.textSecondary },
+  reviewsTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 8 },
+  reviewItem: { paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.background },
+  reviewTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reviewAuthor: { fontSize: 13, fontWeight: '600', color: Colors.text, maxWidth: 120 },
+  reviewRating: { fontSize: 11 },
+  reviewTime: { fontSize: 11, color: Colors.textLight, flex: 1, textAlign: 'right' },
+  reviewText: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, lineHeight: 18 },
   routeBtn: { marginTop: 12, height: 44, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   routeBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   routeHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 },
