@@ -93,6 +93,18 @@ export interface ChecklistItem {
   created_at: string;
 }
 
+export interface Favorite {
+  id: string;
+  trip_id: string;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  place_id?: string;
+  note?: string;
+  created_at: string;
+}
+
 export const EXPENSE_CATEGORIES = {
   food: '餐飲',
   transport: '交通',

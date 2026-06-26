@@ -218,13 +218,14 @@ const emptyForm = () => ({
 export default function ItineraryScreen() {
   const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem } = useTripStore();
+  const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem, favorites, fetchFavorites } = useTripStore();
   const { user } = useAuthStore();
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
 
   const [selectedDay, setSelectedDay] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
+  const [addTab, setAddTab] = useState<'manual' | 'favorite'>('manual');
   const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [timeHour, setTimeHour] = useState('');
@@ -240,7 +241,7 @@ export default function ItineraryScreen() {
   const [newTypeInput, setNewTypeInput] = useState('');
   const minInputRef = useRef<any>(null);
 
-  useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); } }, [id]);
+  useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); fetchFavorites(id); } }, [id]);
 
   useEffect(() => {
     if (user) setItemTypes(loadItemTypes(user.id));
@@ -347,7 +348,17 @@ export default function ItineraryScreen() {
     setTimeHour(''); setTimeMin('');
     setLocationInput('');
     setUrlDetected(false);
+    setAddTab('manual');
     setModalVisible(true);
+  };
+
+  // 從收藏清單選一個地點 → 自動帶入名稱與地點（含座標，地圖可精準定位）
+  const pickFavorite = (f: { name: string; address?: string; lat?: number; lng?: number }) => {
+    const url = f.lat != null && f.lng != null ? `https://maps.google.com/?q=${f.lat},${f.lng}` : '';
+    setForm((prev) => ({ ...prev, title: f.name, location: f.address || f.name, locationUrl: url }));
+    setLocationInput(f.address || f.name);
+    setUrlDetected(false);
+    setAddTab('manual');
   };
 
   const openEdit = (item: ItineraryItem) => {
@@ -514,6 +525,35 @@ export default function ItineraryScreen() {
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
 
+            {!editingItem && (
+              <View style={styles.addTabs}>
+                <TouchableOpacity style={[styles.addTab, addTab === 'manual' && styles.addTabActive]} onPress={() => setAddTab('manual')}>
+                  <Text style={[styles.addTabText, addTab === 'manual' && styles.addTabTextActive]}>✏️ 手動輸入</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.addTab, addTab === 'favorite' && styles.addTabActive]} onPress={() => setAddTab('favorite')}>
+                  <Text style={[styles.addTabText, addTab === 'favorite' && styles.addTabTextActive]}>❤️ 收藏清單</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!editingItem && addTab === 'favorite' && (
+              <View style={{ marginTop: 4 }}>
+                {favorites.length === 0 ? (
+                  <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
+                ) : favorites.map((f) => (
+                  <TouchableOpacity key={f.id} style={styles.favPickRow} onPress={() => pickFavorite(f)}>
+                    <Text style={styles.favPickIcon}>❤️</Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.favPickName} numberOfLines={1}>{f.name}</Text>
+                      {!!f.address && <Text style={styles.favPickAddr} numberOfLines={1}>{f.address}</Text>}
+                    </View>
+                    <Text style={styles.favPickArrow}>帶入 →</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {(editingItem || addTab === 'manual') && (<>
             <Text style={styles.label}>類型</Text>
             <View style={styles.typeRow}>
               {itemTypes.map((e) => (
@@ -608,15 +648,18 @@ export default function ItineraryScreen() {
 
             <Text style={styles.label}>備注</Text>
             <TextInput style={[styles.input, { height: 72 }]} value={form.note} onChangeText={(v) => setField('note', v)} placeholder="..." placeholderTextColor={Colors.textLight} multiline />
+            </>)}
 
-            <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>取消</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.createBtn} onPress={handleSave}>
-                <Text style={styles.createText}>{editingItem ? '儲存' : '新增'}</Text>
-              </TouchableOpacity>
-            </View>
+            {(editingItem || addTab === 'manual') && (
+              <View style={styles.modalBtns}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.cancelText}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.createBtn} onPress={handleSave}>
+                  <Text style={styles.createText}>{editingItem ? '儲存' : '新增'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
           </View>
         </View>
@@ -675,6 +718,17 @@ const styles = StyleSheet.create({
   modalScroll: { flex: 1, padding: 24 },
   modalContent: { paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
+  addTabs: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  addTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.background, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  addTabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  addTabText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '600' },
+  addTabTextActive: { color: '#fff' },
+  favPickEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 24, lineHeight: 20 },
+  favPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, backgroundColor: Colors.background, marginBottom: 8 },
+  favPickIcon: { fontSize: 16 },
+  favPickName: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  favPickAddr: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  favPickArrow: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
   urlDetectedBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 4 },

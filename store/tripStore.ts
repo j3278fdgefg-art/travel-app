@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Trip, TripMember, ItineraryDay, ItineraryItem, Booking, Expense, ChecklistItem } from '../types';
+import { Trip, TripMember, ItineraryDay, ItineraryItem, Booking, Expense, ChecklistItem, Favorite } from '../types';
 import { supabase } from '../lib/supabase';
 
 export interface ActivityLog {
@@ -20,6 +20,7 @@ interface TripStore {
   bookings: Booking[];
   expenses: Expense[];
   checklist: ChecklistItem[];
+  favorites: Favorite[];
   activityLogs: ActivityLog[];
   loading: boolean;
 
@@ -34,6 +35,9 @@ interface TripStore {
   fetchBookings: (tripId: string) => Promise<void>;
   fetchExpenses: (tripId: string) => Promise<void>;
   fetchChecklist: (tripId: string) => Promise<void>;
+  fetchFavorites: (tripId: string) => Promise<void>;
+  addFavorite: (fav: Partial<Favorite>) => Promise<Favorite | null>;
+  removeFavorite: (id: string) => Promise<void>;
   addExpense: (expense: Partial<Expense>) => Promise<boolean>;
   addChecklistItem: (item: Partial<ChecklistItem>) => Promise<void>;
   toggleChecklistItem: (id: string, done: boolean) => Promise<void>;
@@ -64,6 +68,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
   bookings: [],
   expenses: [],
   checklist: [],
+  favorites: [],
   activityLogs: [],
   loading: false,
 
@@ -199,6 +204,27 @@ export const useTripStore = create<TripStore>((set, get) => ({
       .eq('trip_id', tripId)
       .order('created_at');
     set({ checklist: data || [] });
+  },
+
+  fetchFavorites: async (tripId) => {
+    const { data } = await supabase
+      .from('favorites')
+      .select('*')
+      .eq('trip_id', tripId)
+      .order('created_at', { ascending: false });
+    set({ favorites: data || [] });
+  },
+
+  addFavorite: async (fav) => {
+    const { data, error } = await supabase.from('favorites').insert(fav).select().single();
+    if (error) { console.error('addFavorite error:', error); alert('收藏失敗：' + error.message); return null; }
+    if (data) set((s) => ({ favorites: [data, ...s.favorites] }));
+    return data;
+  },
+
+  removeFavorite: async (id) => {
+    await supabase.from('favorites').delete().eq('id', id);
+    set((s) => ({ favorites: s.favorites.filter((f) => f.id !== id) }));
   },
 
   addExpense: async (expense) => {

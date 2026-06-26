@@ -84,7 +84,7 @@ async function resolveItemCoords(item: ItineraryItem, service: any): Promise<Geo
 
 export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string }>();
-  const { currentTrip, items, fetchTripById, fetchItems } = useTripStore();
+  const { currentTrip, items, fetchTripById, fetchItems, favorites, fetchFavorites, addFavorite, removeFavorite } = useTripStore();
   const { googleMapsApiKey } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const iframeRef = useRef<any>(null);
@@ -106,11 +106,16 @@ export default function MapScreen() {
   const [locating, setLocating] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
 
+  const [showFav, setShowFav] = useState(false);
   const DRAWER_W = 290;
   const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
+  const favX = useRef(new Animated.Value(DRAWER_W)).current;
   useEffect(() => {
     Animated.timing(drawerX, { toValue: showPanel ? 0 : DRAWER_W, duration: 250, useNativeDriver: false }).start();
   }, [showPanel]);
+  useEffect(() => {
+    Animated.timing(favX, { toValue: showFav ? 0 : DRAWER_W, duration: 250, useNativeDriver: false }).start();
+  }, [showFav]);
   const [gLoaded, setGLoaded] = useState(false);
   const [gError, setGError] = useState(false);
 
@@ -123,7 +128,7 @@ export default function MapScreen() {
   const locationItems = items.filter((item) => item.location?.trim());
 
   useEffect(() => {
-    if (id) { fetchTripById(id); fetchItems(id); }
+    if (id) { fetchTripById(id); fetchItems(id); fetchFavorites(id); }
   }, [id]);
 
   useEffect(() => {
@@ -292,7 +297,7 @@ export default function MapScreen() {
         const loc = res.geometry?.location;
         setRoute(null);
         setPlace({
-          name: res.name, rating: res.rating, count: res.user_ratings_total,
+          placeId, name: res.name, rating: res.rating, count: res.user_ratings_total,
           address: res.formatted_address, phone: res.formatted_phone_number,
           openNow, weekday: res.opening_hours?.weekday_text || [],
           type: res.types?.[0], photos, website: res.website,
@@ -345,6 +350,14 @@ export default function MapScreen() {
   const clearRoute = () => {
     setRoute(null);
     try { dirRendererRef.current?.setDirections({ routes: [] }); } catch {}
+  };
+
+  // 收藏
+  const findFav = (p: any) => favorites.find((f) => (p.placeId && f.place_id === p.placeId) || f.name === p.name);
+  const toggleFav = (p: any) => {
+    const existing = findFav(p);
+    if (existing) { removeFavorite(existing.id); return; }
+    addFavorite({ trip_id: id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, place_id: p.placeId });
   };
 
   // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
@@ -452,10 +465,13 @@ export default function MapScreen() {
           )}
         </View>
 
-        {/* 右側控制：清單、定位、導航 */}
+        {/* 右側控制：收藏、清單、定位、導航 */}
         <View style={styles.ctrlStack}>
+          <TouchableOpacity style={[styles.ctrlBtn, showFav && styles.ctrlBtnActive]} onPress={() => { setShowFav((v) => !v); setShowPanel(false); }}>
+            <Text style={styles.ctrlBtnEmoji}>{showFav ? '❤️' : '🤍'}</Text>
+          </TouchableOpacity>
           {locationItems.length > 0 && (
-            <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => setShowPanel((v) => !v)}>
+            <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => { setShowPanel((v) => !v); setShowFav(false); }}>
               <Text style={styles.ctrlBtnEmoji}>📋</Text>
             </TouchableOpacity>
           )}
@@ -497,6 +513,35 @@ export default function MapScreen() {
           </ScrollView>
         </Animated.View>
 
+        {/* 右側滑出的收藏清單抽屜 */}
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: favX }] }]}>
+          <View style={styles.drawerHeader}>
+            <Text style={styles.panelTitle}>❤️ 收藏清單</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.panelCount}>共 {favorites.length} 個</Text>
+            <TouchableOpacity style={styles.drawerClose} onPress={() => setShowFav(false)}>
+              <Text style={styles.drawerCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {favorites.length === 0 ? (
+            <Text style={styles.favEmpty}>還沒有收藏。{'\n'}點地圖上的店家，按 🤍 即可收藏。</Text>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
+              {favorites.map((f) => (
+                <View key={f.id} style={styles.placeRow}>
+                  <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => { if (f.lat != null && f.lng != null) { setQuery(`${f.lat},${f.lng}`); setMapKey((k) => k + 1); } setShowFav(false); }}>
+                    <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
+                    {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
+                    <Text style={{ fontSize: 13 }}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </Animated.View>
+
         {/* 店家完整資訊卡（點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && (
           <View style={styles.sheet}>
@@ -511,6 +556,9 @@ export default function MapScreen() {
               <View style={styles.placeCardBody}>
                 <View style={styles.placeCardTop}>
                   <Text style={styles.placeCardName} numberOfLines={2}>{place.name}</Text>
+                  <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
+                    <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setPlace(null)} style={styles.drawerClose}>
                     <Text style={styles.drawerCloseText}>✕</Text>
                   </TouchableOpacity>
@@ -615,7 +663,10 @@ const styles = StyleSheet.create({
   sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: 360, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
   placeCardBody: { padding: 14 },
-  placeCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  placeCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  favHeart: { padding: 4 },
+  favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
+  favRemove: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
   placeCardName: { flex: 1, fontSize: 18, fontWeight: '700', color: Colors.text },
   placeMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   placeMeta: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
