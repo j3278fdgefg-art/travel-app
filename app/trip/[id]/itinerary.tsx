@@ -543,15 +543,19 @@ export default function ItineraryScreen() {
                 </View>
               </View>
 
-              {/* 兩個行程之間的交通時間 */}
+              {/* 兩個行程之間的交通時間（中間直線連續） */}
               {next && (
-                <TouchableOpacity style={styles.transitRow} activeOpacity={0.7} onPress={() => openTransitEdit(next)}>
-                  {next.transit_min ? (
-                    <Text style={styles.transitText}>{next.transit_mode || '🚶'} {transitLabel(next.transit_mode)} {next.transit_min} 分</Text>
-                  ) : (
-                    <Text style={styles.transitAdd}>＋ 加交通時間</Text>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.transitRow}>
+                  <View style={{ width: 50 }} />
+                  <View style={styles.transitDotCol}><View style={styles.transitLine} /></View>
+                  <TouchableOpacity style={styles.transitTouch} activeOpacity={0.7} onPress={() => openTransitEdit(next)}>
+                    {next.transit_min ? (
+                      <Text style={styles.transitText}>{next.transit_mode || '🚶'} {transitLabel(next.transit_mode)} {next.transit_min} 分</Text>
+                    ) : (
+                      <Text style={styles.transitAdd}>＋ 加交通時間</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               )}
               </View>
             );
@@ -796,7 +800,10 @@ const styles = StyleSheet.create({
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
   itemBtnEmoji: { fontSize: 13 },
   itemBtnLabel: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
-  transitRow: { paddingLeft: 86, paddingVertical: 4, marginBottom: 4 },
+  transitRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 4 },
+  transitDotCol: { width: 24, marginRight: 12, alignItems: 'center' },
+  transitLine: { width: 2, flex: 1, backgroundColor: Colors.border },
+  transitTouch: { flex: 1, justifyContent: 'center', paddingVertical: 8 },
   transitText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
   transitAdd: { fontSize: 12, color: Colors.textLight },
   transitBox: { backgroundColor: Colors.card, borderRadius: 20, padding: 22, width: '88%', maxWidth: 360 },
