@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  SafeAreaView, Platform, ActivityIndicator, ScrollView,
+  SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
@@ -86,7 +86,13 @@ export default function MapScreen() {
   const [query, setQuery] = useState(defaultQuery);
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
-  const [showPanel, setShowPanel] = useState(true);
+  const [showPanel, setShowPanel] = useState(false);
+
+  const DRAWER_W = 290;
+  const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
+  useEffect(() => {
+    Animated.timing(drawerX, { toValue: showPanel ? 0 : DRAWER_W, duration: 250, useNativeDriver: false }).start();
+  }, [showPanel]);
   const [gLoaded, setGLoaded] = useState(false);
   const [gError, setGError] = useState(false);
 
@@ -133,7 +139,7 @@ export default function MapScreen() {
       if (!mapRef.current) {
         mapRef.current = new google.maps.Map(mapElRef.current, {
           center: { lat: centerLat, lng: centerLng }, zoom: 12,
-          mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
+          mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
           gestureHandling: 'greedy', // 單指即可拖曳/縮放
           zoomControl: false,
         });
@@ -220,11 +226,22 @@ export default function MapScreen() {
     if (s) { setQuery(s); setMapKey((k) => k + 1); }
   };
 
-  // Google 地圖導航：導航到目前地圖上的地點（搜尋或點選的）
+  // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
   const navigateToQuery = () => {
     const dest = query && query !== defaultQuery ? query : (currentTrip?.destination || query);
     if (!dest) { alert('請先搜尋或點選一個地點'); return; }
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`, '_blank');
+    const enc = encodeURIComponent(dest);
+    const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${enc}`;
+    const ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      window.location.href = `comgooglemaps://?daddr=${enc}&directionsmode=driving`;
+      setTimeout(() => { window.location.href = webUrl; }, 1200);
+    } else if (/Android/i.test(ua)) {
+      window.location.href = `google.navigation:q=${enc}`;
+      setTimeout(() => { window.location.href = webUrl; }, 1200);
+    } else {
+      window.open(webUrl, '_blank');
+    }
   };
 
   // 點地點卡片 → 地圖移過去（並更新搜尋框與導航目標）
@@ -252,56 +269,7 @@ export default function MapScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={{ height: 12 }} />
-
-      {/* 搜尋列 */}
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="搜尋景點、地址..."
-          placeholderTextColor={Colors.textLight}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <Text style={styles.searchBtnEmoji}>🔍</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 行程地點面板 */}
-      {showPanel && locationItems.length > 0 && (
-        <View style={styles.panel}>
-          <View style={styles.panelHeader}>
-            <Text style={styles.panelTitle}>📍 行程地點</Text>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.panelCount}>共 {locationItems.length} 個</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            <View style={styles.chipRow}>
-              {locationItems.map((item, idx) => {
-                const meta = typeMeta(item.type);
-                return (
-                  <TouchableOpacity key={item.id} style={styles.placeChip} activeOpacity={0.7} onPress={() => showOnMap(item)}>
-                    <View style={styles.placeChipTop}>
-                      <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
-                      {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
-                    </View>
-                    <Text style={styles.placeName} numberOfLines={1}>{item.title}</Text>
-                    <View style={styles.placeCatRow}>
-                      <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
-                      <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-        </View>
-      )}
-
-      {/* 地圖 */}
+      {/* 地圖（布滿整頁） */}
       <View style={styles.mapContainer}>
         {useFullMap ? (
           !gLoaded ? (
@@ -332,15 +300,29 @@ export default function MapScreen() {
           </>
         )}
 
-        {/* 收合/顯示清單膠囊 */}
-        {locationItems.length > 0 && (
-          <TouchableOpacity style={styles.collapsePill} onPress={() => setShowPanel((v) => !v)} activeOpacity={0.85}>
-            <Text style={styles.collapsePillText}>{showPanel ? '▾ 收合清單' : `▴ 顯示行程地點（${locationItems.length}）`}</Text>
+        {/* 浮在地圖上的搜尋列 */}
+        <View style={styles.searchRow}>
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="搜尋景點、地址..."
+            placeholderTextColor={Colors.textLight}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+            <Text style={styles.searchBtnEmoji}>🔍</Text>
           </TouchableOpacity>
-        )}
+        </View>
 
-        {/* 右側控制：定位、導航 */}
+        {/* 右側控制：清單、定位、導航 */}
         <View style={styles.ctrlStack}>
+          {locationItems.length > 0 && (
+            <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => setShowPanel((v) => !v)}>
+              <Text style={styles.ctrlBtnEmoji}>📋</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.ctrlBtn} onPress={handleLocate} disabled={locating}>
             {locating ? <ActivityIndicator size="small" color={Colors.primary} /> : <Text style={styles.ctrlBtnEmoji}>📍</Text>}
           </TouchableOpacity>
@@ -348,6 +330,36 @@ export default function MapScreen() {
             <Text style={styles.ctrlBtnEmoji}>🧭</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 右側滑出的行程地點抽屜 */}
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: drawerX }] }]}>
+          <View style={styles.drawerHeader}>
+            <Text style={styles.panelTitle}>📍 行程地點</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.panelCount}>共 {locationItems.length} 個</Text>
+            <TouchableOpacity style={styles.drawerClose} onPress={() => setShowPanel(false)}>
+              <Text style={styles.drawerCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
+            {locationItems.map((item, idx) => {
+              const meta = typeMeta(item.type);
+              return (
+                <TouchableOpacity key={item.id} style={styles.placeRow} activeOpacity={0.7} onPress={() => showOnMap(item)}>
+                  <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.placeName} numberOfLines={1}>{item.title}</Text>
+                    <View style={styles.placeCatRow}>
+                      {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
+                      <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
+                      <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -355,32 +367,32 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, marginBottom: 8 },
-  searchInput: { flex: 1, height: 46, backgroundColor: Colors.card, borderRadius: 14, paddingHorizontal: 16, fontSize: 14, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
-  searchBtn: { width: 46, height: 46, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  mapContainer: { flex: 1, backgroundColor: '#EAE7DF', position: 'relative', overflow: 'hidden' },
+  // 浮在地圖上的搜尋列
+  searchRow: { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 5 },
+  searchInput: { flex: 1, height: 46, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 16, fontSize: 14, color: Colors.text, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  searchBtn: { width: 46, height: 46, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   searchBtnEmoji: { fontSize: 18 },
-  panel: { marginHorizontal: 12, marginBottom: 8, backgroundColor: Colors.card, borderRadius: 16, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  panelHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  // 右側控制按鈕
+  ctrlStack: { position: 'absolute', top: 70, right: 12, gap: 8, zIndex: 5 },
+  ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  ctrlBtnActive: { backgroundColor: Colors.primary },
+  ctrlBtnEmoji: { fontSize: 18 },
+  // 右側滑出抽屜
+  drawer: { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: Colors.background, paddingHorizontal: 12, paddingTop: 12, zIndex: 6, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: -4, height: 0 }, elevation: 8 },
+  drawerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 4 },
+  drawerClose: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  drawerCloseText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '700' },
   panelTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   panelCount: { fontSize: 12, color: Colors.textSecondary },
-  chipScroll: { maxHeight: 150 },
-  chipRow: { flexDirection: 'row', gap: 9 },
-  placeChip: { width: 150, backgroundColor: '#F7F5EF', borderRadius: 13, padding: 11, borderWidth: 1.5, borderColor: Colors.border },
-  placeChipTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  placeNum: { width: 20, height: 20, borderRadius: 6, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  placeNumText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.card, borderRadius: 13, padding: 11, borderWidth: 1, borderColor: Colors.border },
+  placeNum: { width: 22, height: 22, borderRadius: 6, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  placeNumText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   placeTime: { fontSize: 11, fontWeight: '700', color: Colors.primaryDark },
-  placeName: { fontSize: 14, fontWeight: '600', color: Colors.text, marginTop: 8 },
-  placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
-  noLocations: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 8 },
-  mapContainer: { flex: 1, marginHorizontal: 12, borderRadius: 16, overflow: 'hidden', marginBottom: 10, backgroundColor: '#EAE7DF', minHeight: 350, position: 'relative' },
-  collapsePill: { position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: Colors.card, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  collapsePillText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
-  ctrlStack: { position: 'absolute', top: 56, right: 12, gap: 8 },
-  ctrlBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  ctrlBtnEmoji: { fontSize: 18 },
-  keyHint: { position: 'absolute', bottom: 10, left: 10, right: 10, backgroundColor: 'rgba(44,44,44,0.82)', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12 },
+  keyHint: { position: 'absolute', bottom: 14, left: 12, right: 12, backgroundColor: 'rgba(44,44,44,0.82)', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, zIndex: 4 },
   keyHintText: { color: '#fff', fontSize: 12, textAlign: 'center', fontWeight: '500' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EAE7DF' },
   centerEmoji: { fontSize: 48, marginBottom: 12 },
