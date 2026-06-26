@@ -97,6 +97,10 @@ export default function MapScreen() {
   const acServiceRef = useRef<any>(null);
   const acTimer = useRef<any>(null);
   const [place, setPlace] = useState<any | null>(null);
+  const [route, setRoute] = useState<any | null>(null);
+  const [routing, setRouting] = useState(false);
+  const dirServiceRef = useRef<any>(null);
+  const dirRendererRef = useRef<any>(null);
   const [query, setQuery] = useState(defaultQuery);
   const [mapKey, setMapKey] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -159,6 +163,11 @@ export default function MapScreen() {
         });
         placesRef.current = new google.maps.places.PlacesService(mapRef.current);
         acServiceRef.current = new google.maps.places.AutocompleteService();
+        dirServiceRef.current = new google.maps.DirectionsService();
+        dirRendererRef.current = new google.maps.DirectionsRenderer({
+          map: mapRef.current, suppressMarkers: false,
+          polylineOptions: { strokeColor: Colors.info, strokeWeight: 5, strokeOpacity: 0.9 },
+        });
         // 點地圖上任何店家 POI → 在 App 內顯示店家資訊（不跳 Google 地圖）
         mapRef.current.addListener('click', (e: any) => {
           if (e.placeId) { e.stop(); showPlaceDetails(e.placeId); }
@@ -271,23 +280,71 @@ export default function MapScreen() {
   const showPlaceDetails = (placeId: string) => {
     if (!placesRef.current || !placeId) return;
     placesRef.current.getDetails(
-      { placeId, fields: ['name', 'rating', 'user_ratings_total', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'types', 'photos', 'geometry'] },
+      { placeId, fields: ['name', 'rating', 'user_ratings_total', 'formatted_address', 'opening_hours', 'formatted_phone_number', 'types', 'photos', 'geometry', 'website'] },
       (res: any, status: any) => {
         const g = (window as any).google;
         if (status !== g.maps.places.PlacesServiceStatus.OK || !res) return;
-        let photoUrl = '';
-        try { if (res.photos?.[0]) photoUrl = res.photos[0].getUrl({ maxWidth: 480, maxHeight: 260 }); } catch {}
+        const photos: string[] = [];
+        try { (res.photos || []).slice(0, 5).forEach((p: any) => photos.push(p.getUrl({ maxWidth: 600, maxHeight: 320 }))); } catch {}
         let openNow: boolean | undefined;
         try { openNow = res.opening_hours?.isOpen?.(); } catch {}
         if (openNow === undefined) openNow = res.opening_hours?.open_now;
+        const loc = res.geometry?.location;
+        setRoute(null);
         setPlace({
           name: res.name, rating: res.rating, count: res.user_ratings_total,
           address: res.formatted_address, phone: res.formatted_phone_number,
-          openNow, type: res.types?.[0], photoUrl,
+          openNow, weekday: res.opening_hours?.weekday_text || [],
+          type: res.types?.[0], photos, website: res.website,
+          lat: loc ? loc.lat() : undefined, lng: loc ? loc.lng() : undefined,
         });
-        if (res.geometry?.location && mapRef.current) mapRef.current.panTo(res.geometry.location);
+        if (loc && mapRef.current) mapRef.current.panTo(loc);
       }
     );
+  };
+
+  // App 內路線：算路徑、畫在地圖上、列步驟（非即時導航）
+  const computeRoute = (dest: { lat: number; lng: number; name?: string }, mode: 'DRIVING' | 'WALKING' | 'TRANSIT') => {
+    if (!dirServiceRef.current || !mapRef.current) return;
+    const g = (window as any).google;
+    setRouting(true);
+    const run = (origin: { lat: number; lng: number }) => {
+      dirServiceRef.current.route(
+        { origin, destination: { lat: dest.lat, lng: dest.lng }, travelMode: g.maps.TravelMode[mode] },
+        (result: any, status: any) => {
+          setRouting(false);
+          if (status === 'OK' && result.routes?.[0]) {
+            dirRendererRef.current.setDirections(result);
+            const leg = result.routes[0].legs[0];
+            setRoute({
+              mode, dest,
+              distance: leg.distance?.text, duration: leg.duration?.text,
+              steps: (leg.steps || []).map((s: any) => ({
+                instr: (s.instructions || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+                dist: s.distance?.text,
+              })),
+            });
+            setPlace(null);
+          } else {
+            alert('找不到這個交通方式的路線，換一種試試');
+          }
+        }
+      );
+    };
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => run({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => { const c = mapRef.current.getCenter(); run({ lat: c.lat(), lng: c.lng() }); },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      const c = mapRef.current.getCenter(); run({ lat: c.lat(), lng: c.lng() });
+    }
+  };
+
+  const clearRoute = () => {
+    setRoute(null);
+    try { dirRendererRef.current?.setDirections({ routes: [] }); } catch {}
   };
 
   // 導航：優先喚起 Google 地圖 APP，沒裝再退回網頁版
@@ -437,31 +494,82 @@ export default function MapScreen() {
           </ScrollView>
         </Animated.View>
 
-        {/* 店家資訊卡（點地圖店家 / 標記時跳出，不離開 App） */}
-        {place && (
-          <View style={styles.placeCard}>
-            {!!place.photoUrl && (
-              <img src={place.photoUrl} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
-            )}
-            <View style={styles.placeCardBody}>
-              <View style={styles.placeCardTop}>
-                <Text style={styles.placeCardName} numberOfLines={2}>{place.name}</Text>
-                <TouchableOpacity onPress={() => setPlace(null)} style={styles.drawerClose}>
-                  <Text style={styles.drawerCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.placeMetaRow}>
-                {!!place.rating && <Text style={styles.placeMeta}>⭐ {place.rating}（{place.count || 0}）</Text>}
-                {!!place.type && <Text style={styles.placeMeta}>{placeTypeLabel(place.type)}</Text>}
-                {place.openNow !== undefined && (
-                  <Text style={[styles.placeMeta, { color: place.openNow ? Colors.success : Colors.danger, fontWeight: '700' }]}>
-                    {place.openNow ? '營業中' : '休息中'}
-                  </Text>
+        {/* 店家完整資訊卡（點地圖店家 / 標記時跳出，不離開 App） */}
+        {place && !route && (
+          <View style={styles.sheet}>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              {place.photos?.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
+                  {place.photos.map((url: string, i: number) => (
+                    <img key={i} src={url} style={{ width: 220, height: 140, objectFit: 'cover', display: 'block', marginRight: 6 }} />
+                  ))}
+                </ScrollView>
+              )}
+              <View style={styles.placeCardBody}>
+                <View style={styles.placeCardTop}>
+                  <Text style={styles.placeCardName} numberOfLines={2}>{place.name}</Text>
+                  <TouchableOpacity onPress={() => setPlace(null)} style={styles.drawerClose}>
+                    <Text style={styles.drawerCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.placeMetaRow}>
+                  {!!place.rating && <Text style={styles.placeMeta}>⭐ {place.rating}（{place.count || 0}）</Text>}
+                  {!!place.type && <Text style={styles.placeMeta}>{placeTypeLabel(place.type)}</Text>}
+                  {place.openNow !== undefined && (
+                    <Text style={[styles.placeMeta, { color: place.openNow ? Colors.success : Colors.danger, fontWeight: '700' }]}>
+                      {place.openNow ? '營業中' : '休息中'}
+                    </Text>
+                  )}
+                </View>
+
+                {/* 路線按鈕 */}
+                {place.lat !== undefined && (
+                  <TouchableOpacity style={styles.routeBtn} onPress={() => computeRoute({ lat: place.lat, lng: place.lng, name: place.name }, 'DRIVING')} disabled={routing}>
+                    {routing ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.routeBtnText}>🚗 在 App 內查看路線</Text>}
+                  </TouchableOpacity>
+                )}
+
+                {!!place.address && <Text style={styles.placeAddr}>📍 {place.address}</Text>}
+                {!!place.phone && <Text style={styles.placeAddr}>📞 {place.phone}</Text>}
+                {!!place.website && (
+                  <Text style={styles.placeLink} onPress={() => window.open(place.website, '_blank')} numberOfLines={1}>🌐 {place.website}</Text>
+                )}
+                {place.weekday?.length > 0 && (
+                  <View style={styles.hoursBox}>
+                    {place.weekday.map((d: string, i: number) => <Text key={i} style={styles.hoursLine}>{d}</Text>)}
+                  </View>
                 )}
               </View>
-              {!!place.address && <Text style={styles.placeAddr}>📍 {place.address}</Text>}
-              {!!place.phone && <Text style={styles.placeAddr}>📞 {place.phone}</Text>}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* App 內路線面板 */}
+        {route && (
+          <View style={styles.sheet}>
+            <View style={styles.routeHeader}>
+              <Text style={styles.routeSummary}>{route.duration} · {route.distance}</Text>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity onPress={clearRoute} style={styles.drawerClose}>
+                <Text style={styles.drawerCloseText}>✕</Text>
+              </TouchableOpacity>
             </View>
+            <View style={styles.modeTabs}>
+              {(['WALKING', 'DRIVING', 'TRANSIT'] as const).map((m) => (
+                <TouchableOpacity key={m} style={[styles.modeTab, route.mode === m && styles.modeTabActive]} onPress={() => computeRoute(route.dest, m)}>
+                  <Text style={[styles.modeTabText, route.mode === m && styles.modeTabTextActive]}>{m === 'WALKING' ? '🚶 走路' : m === 'DRIVING' ? '🚗 開車' : '🚌 大眾運輸'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+              {route.steps.map((s: any, i: number) => (
+                <View key={i} style={styles.stepRow}>
+                  <Text style={styles.stepNum}>{i + 1}</Text>
+                  <Text style={styles.stepInstr}>{s.instr}</Text>
+                  {!!s.dist && <Text style={styles.stepDist}>{s.dist}</Text>}
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -473,16 +581,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   mapContainer: { flex: 1, backgroundColor: '#EAE7DF', position: 'relative', overflow: 'hidden' },
   // 浮在地圖上的搜尋列
-  searchRow: { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 5 },
-  searchInput: { flex: 1, height: 46, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 16, fontSize: 14, color: Colors.text, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  searchBtn: { width: 46, height: 46, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  searchBtnEmoji: { fontSize: 18 },
-  acDropdown: { position: 'absolute', top: 50, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  searchRow: { position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 5 },
+  searchInput: { flex: 1, height: 52, backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 18, fontSize: 15, color: Colors.text, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  searchBtn: { width: 52, height: 52, borderRadius: 16, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primaryDark, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  searchBtnEmoji: { fontSize: 20 },
+  acDropdown: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
   acRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
   acIcon: { fontSize: 13 },
   acText: { flex: 1, fontSize: 13, color: Colors.text },
   // 右側控制按鈕
-  ctrlStack: { position: 'absolute', top: 70, right: 12, gap: 8, zIndex: 5 },
+  ctrlStack: { position: 'absolute', top: 80, right: 14, gap: 8, zIndex: 5 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   ctrlBtnActive: { backgroundColor: Colors.primary },
   ctrlBtnEmoji: { fontSize: 18 },
@@ -500,13 +608,30 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 14, fontWeight: '600', color: Colors.text },
   placeCatRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   placeCat: { fontSize: 11, color: Colors.textSecondary },
-  placeCard: { position: 'absolute', bottom: 14, left: 12, right: 12, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  sheet: { position: 'absolute', bottom: 14, left: 12, right: 12, maxHeight: 360, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  photoStrip: { },
   placeCardBody: { padding: 14 },
   placeCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  placeCardName: { flex: 1, fontSize: 17, fontWeight: '700', color: Colors.text },
+  placeCardName: { flex: 1, fontSize: 18, fontWeight: '700', color: Colors.text },
   placeMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   placeMeta: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
   placeAddr: { fontSize: 13, color: Colors.textSecondary, marginTop: 8, lineHeight: 19 },
+  placeLink: { fontSize: 13, color: Colors.info, marginTop: 8 },
+  hoursBox: { marginTop: 10, backgroundColor: Colors.background, borderRadius: 10, padding: 10, gap: 2 },
+  hoursLine: { fontSize: 12, color: Colors.textSecondary },
+  routeBtn: { marginTop: 12, height: 44, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  routeBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  routeHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 },
+  routeSummary: { fontSize: 17, fontWeight: '700', color: Colors.text },
+  modeTabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  modeTab: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.background, alignItems: 'center' },
+  modeTabActive: { backgroundColor: Colors.primary },
+  modeTabText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  modeTabTextActive: { color: '#fff' },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.background },
+  stepNum: { width: 20, fontSize: 13, fontWeight: '700', color: Colors.primary },
+  stepInstr: { flex: 1, fontSize: 13, color: Colors.text, lineHeight: 18 },
+  stepDist: { fontSize: 12, color: Colors.textLight },
   keyHint: { position: 'absolute', bottom: 14, left: 12, right: 12, backgroundColor: 'rgba(44,44,44,0.82)', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, zIndex: 4 },
   keyHintText: { color: '#fff', fontSize: 12, textAlign: 'center', fontWeight: '500' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EAE7DF' },
