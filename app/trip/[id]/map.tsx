@@ -421,9 +421,10 @@ export default function MapScreen() {
           </>
         )}
 
-        {/* 浮在地圖上的搜尋列 */}
+        {/* 浮在地圖上的搜尋列（滿版） */}
         <View style={styles.searchRow}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
               value={search}
@@ -433,20 +434,22 @@ export default function MapScreen() {
               onSubmitEditing={handleSearch}
               returnKeyType="search"
             />
-            {predictions.length > 0 && (
-              <View style={styles.acDropdown}>
-                {predictions.map((p) => (
-                  <TouchableOpacity key={p.place_id} style={styles.acRow} onPress={() => pickPrediction(p)}>
-                    <Text style={styles.acIcon}>📍</Text>
-                    <Text style={styles.acText} numberOfLines={1}>{p.description}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            {!!search && (
+              <TouchableOpacity onPress={() => { setSearch(''); setPredictions([]); }}>
+                <Text style={styles.searchClear}>✕</Text>
+              </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-            <Text style={styles.searchBtnEmoji}>🔍</Text>
-          </TouchableOpacity>
+          {predictions.length > 0 && (
+            <View style={styles.acDropdown}>
+              {predictions.map((p) => (
+                <TouchableOpacity key={p.place_id} style={styles.acRow} onPress={() => pickPrediction(p)}>
+                  <Text style={styles.acIcon}>📍</Text>
+                  <Text style={styles.acText} numberOfLines={1}>{p.description}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* 右側控制：清單、定位、導航 */}
@@ -581,16 +584,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   mapContainer: { flex: 1, backgroundColor: '#EAE7DF', position: 'relative', overflow: 'hidden' },
   // 浮在地圖上的搜尋列
-  searchRow: { position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 5 },
-  searchInput: { flex: 1, height: 52, backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 18, fontSize: 15, color: Colors.text, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
-  searchBtn: { width: 52, height: 52, borderRadius: 16, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primaryDark, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
-  searchBtnEmoji: { fontSize: 20 },
-  acDropdown: { position: 'absolute', top: 58, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  searchRow: { position: 'absolute', top: 14, left: 14, right: 14, zIndex: 5 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 58, backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 16, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  searchIcon: { fontSize: 17 },
+  searchInput: { flex: 1, height: '100%', fontSize: 15, color: Colors.text },
+  searchClear: { fontSize: 15, color: Colors.textLight, paddingHorizontal: 4 },
+  acDropdown: { position: 'absolute', top: 64, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
   acRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
   acIcon: { fontSize: 13 },
   acText: { flex: 1, fontSize: 13, color: Colors.text },
   // 右側控制按鈕
-  ctrlStack: { position: 'absolute', top: 80, right: 14, gap: 8, zIndex: 5 },
+  ctrlStack: { position: 'absolute', top: 86, right: 14, gap: 8, zIndex: 5 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   ctrlBtnActive: { backgroundColor: Colors.primary },
   ctrlBtnEmoji: { fontSize: 18 },
