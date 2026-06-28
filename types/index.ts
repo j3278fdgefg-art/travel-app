@@ -38,6 +38,7 @@ export interface ItineraryItem {
   location: string;
   location_url?: string;
   address?: string;
+  place_id?: string;
   note: string;
   type: 'transport' | 'accommodation' | 'food' | 'attraction' | 'other';
   order_index: number;

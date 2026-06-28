@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated,
@@ -148,8 +148,8 @@ async function resolveItemCoords(item: ItineraryItem, service: any): Promise<Geo
 }
 
 export default function MapScreen() {
-  const params = useGlobalSearchParams<{ id: string; q?: string }>();
-  const { currentTrip, items, fetchTripById, fetchItems, favorites, fetchFavorites, addFavorite, removeFavorite } = useTripStore();
+  const params = useGlobalSearchParams<{ id: string; q?: string; placeId?: string }>();
+  const { currentTrip, days, items, fetchTripById, fetchDays, fetchItems, favorites, fetchFavorites, addFavorite, removeFavorite } = useTripStore();
   const { googleMapsApiKey } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const iframeRef = useRef<any>(null);
@@ -196,11 +196,22 @@ export default function MapScreen() {
   const showRouteRef = useRef(true);
   const searchMarkerRef = useRef<any>(null);
   const pendingQRef = useRef<string | null>(null);
+  const pendingPlaceIdRef = useRef<string | null>(null);
 
-  const locationItems = items.filter((item) => item.location?.trim());
+  const locationItems = (() => {
+    const dayOrder: Record<string, number> = {};
+    days.forEach((d, i) => { dayOrder[d.id] = i; });
+    return items
+      .filter((item) => item.location?.trim())
+      .sort((a, b) => {
+        const dd = (dayOrder[a.day_id] ?? 999) - (dayOrder[b.day_id] ?? 999);
+        if (dd !== 0) return dd;
+        return (a.time || '').localeCompare(b.time || '');
+      });
+  })();
 
   useEffect(() => {
-    if (id) { fetchTripById(id); fetchItems(id); fetchFavorites(id); }
+    if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); fetchFavorites(id); }
   }, [id]);
 
   useEffect(() => {
@@ -208,10 +219,17 @@ export default function MapScreen() {
       const q = decodeURIComponent(params.q as string);
       setSearch(q);
       if (placesRef.current) searchAndShow(q);
-      else pendingQRef.current = q; // 地圖還沒載入，待載入後再標出
+      else pendingQRef.current = q;
     }
   }, [params.q]);
 
+  useEffect(() => {
+    if (params.placeId) {
+      const pid = decodeURIComponent(params.placeId as string);
+      if (placesRef.current) showPlaceDetails(pid);
+      else pendingPlaceIdRef.current = pid;
+    }
+  }, [params.placeId]);
 
   useEffect(() => {
     if (currentTrip && !params.q && (query === '釜山' || !query)) {
@@ -256,8 +274,12 @@ export default function MapScreen() {
           if (e.placeId) { e.stop(); showPlaceDetails(e.placeId); }
         });
 
-        // places service 剛建好，處理行程頁帶進來的 pending query
-        if (pendingQRef.current) {
+        // places service 剛建好，處理行程頁帶進來的 pending placeId / query
+        if (pendingPlaceIdRef.current) {
+          const pid = pendingPlaceIdRef.current;
+          pendingPlaceIdRef.current = null;
+          setTimeout(() => showPlaceDetails(pid), 0);
+        } else if (pendingQRef.current) {
           const pq = pendingQRef.current;
           pendingQRef.current = null;
           setTimeout(() => searchAndShow(pq), 0);
@@ -684,18 +706,26 @@ export default function MapScreen() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
             {locationItems.map((item, idx) => {
               const meta = typeMeta(item.type);
+              const prevItem = locationItems[idx - 1];
+              const isNewDay = !prevItem || prevItem.day_id !== item.day_id;
+              const day = days.find((d) => d.id === item.day_id);
               return (
-                <TouchableOpacity key={item.id} style={styles.placeRow} activeOpacity={0.7} onPress={() => showOnMap(item)}>
-                  <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.placeName} numberOfLines={1}>{item.title}</Text>
-                    <View style={styles.placeCatRow}>
-                      {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
-                      <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
-                      <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
+                <React.Fragment key={item.id}>
+                  {isNewDay && day && (
+                    <Text style={styles.panelDayHeader}>第 {day.day_number} 天 · {day.date}</Text>
+                  )}
+                  <TouchableOpacity style={styles.placeRow} activeOpacity={0.7} onPress={() => showOnMap(item)}>
+                    <View style={styles.placeNum}><Text style={styles.placeNumText}>{idx + 1}</Text></View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.placeName} numberOfLines={1}>{item.title}</Text>
+                      <View style={styles.placeCatRow}>
+                        {!!item.time && <Text style={styles.placeTime}>{item.time}</Text>}
+                        <Text style={{ fontSize: 11 }}>{meta.emoji}</Text>
+                        <Text style={styles.placeCat} numberOfLines={1}>{meta.label}</Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </React.Fragment>
               );
             })}
           </ScrollView>
@@ -866,6 +896,7 @@ const styles = StyleSheet.create({
   drawerCloseText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '700' },
   panelTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   panelCount: { fontSize: 12, color: Colors.textSecondary },
+  panelDayHeader: { fontSize: 12, fontWeight: '700', color: Colors.primary, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.card, borderRadius: 13, padding: 11, borderWidth: 1, borderColor: Colors.border },
   placeNum: { width: 22, height: 22, borderRadius: 6, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   placeNumText: { color: '#fff', fontSize: 12, fontWeight: '700' },

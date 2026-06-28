@@ -231,7 +231,7 @@ function saveItemTypes(userId: string, list: string[]) {
 
 
 const emptyForm = () => ({
-  time: '', title: '', location: '', locationUrl: '', address: '', note: '',
+  time: '', title: '', location: '', locationUrl: '', address: '', placeId: '', note: '',
   type: '📸',
 });
 
@@ -375,10 +375,10 @@ export default function ItineraryScreen() {
     setModalVisible(true);
   };
 
-  // 從收藏清單選一個地點 → 自動帶入名稱與地點（含座標，地圖可精準定位）
-  const pickFavorite = (f: { name: string; address?: string; lat?: number; lng?: number }) => {
+  // 從收藏清單選一個地點 → 自動帶入名稱、地點、place_id（地圖直接跳資訊卡）
+  const pickFavorite = (f: { name: string; address?: string; lat?: number; lng?: number; place_id?: string }) => {
     const url = f.lat != null && f.lng != null ? `https://maps.google.com/?q=${f.lat},${f.lng}` : '';
-    setForm((prev) => ({ ...prev, title: f.name, location: f.address || f.name, locationUrl: url }));
+    setForm((prev) => ({ ...prev, title: f.name, location: f.address || f.name, locationUrl: url, placeId: f.place_id || '' }));
     setLocationInput(f.address || f.name);
     setUrlDetected(false);
     setAddTab('manual');
@@ -395,6 +395,7 @@ export default function ItineraryScreen() {
       location: item.location || '',
       locationUrl: item.location_url || '',
       address: item.address || '',
+      placeId: item.place_id || '',
       note: item.note || '',
       type: item.type,
     });
@@ -413,6 +414,7 @@ export default function ItineraryScreen() {
         time: form.time, title: form.title, location: form.location,
         location_url: form.locationUrl,
         address: form.address || undefined,
+        place_id: form.placeId || undefined,
         note: form.note, type: toDbType(form.type) as any,
       });
     } else {
@@ -421,6 +423,7 @@ export default function ItineraryScreen() {
         time: form.time, title: form.title, location: form.location,
         location_url: form.locationUrl,
         address: form.address || undefined,
+        place_id: form.placeId || undefined,
         note: form.note, type: toDbType(form.type) as any,
         order_index: currentDayItems.length,
       });
@@ -433,6 +436,10 @@ export default function ItineraryScreen() {
   };
 
   const openInMap = (item: ItineraryItem) => {
+    if (item.place_id) {
+      router.push(`/trip/${id}/map?placeId=${encodeURIComponent(item.place_id)}` as any);
+      return;
+    }
     const q = item.address?.trim() || item.title.trim() ||
       (item.location || '').replace(/https?:\/\/\S+/g, '').replace(/[，,]\s*$/, '').trim();
     if (q) router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
