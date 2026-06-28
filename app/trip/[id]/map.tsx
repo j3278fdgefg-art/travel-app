@@ -80,14 +80,16 @@ function googleTextSearch(service: any, query: string): Promise<GeoHit | null> {
 async function resolveItemCoords(item: ItineraryItem, service: any): Promise<GeoHit | null> {
   const locUrl = item.location_url || '';
   const loc = item.location || '';
+  const rawUrl = (locUrl || loc).match(/https?:\/\/\S+/)?.[0] || '';
 
-  // 1. 直接從 URL 提取座標（長網址含 @lat,lng 等格式）
-  const fromUrl = extractCoordsFromUrl(locUrl) || extractCoordsFromUrl(loc);
-  if (fromUrl) return fromUrl;
-
-  // 2. 短網址 → 追蹤 HTTP 轉址，從最終 URL 取座標
-  const rawUrl = (locUrl || loc).match(/https?:\/\/\S+/)?.[0];
-  if (rawUrl) {
+  // 1. 短網址優先 → 追蹤 HTTP 轉址，從最終 URL 取座標
+  const isShortUrl = rawUrl && (
+    rawUrl.includes('maps.app.goo.gl') ||
+    rawUrl.includes('goo.gl/maps') ||
+    rawUrl.includes('naver.me') ||
+    rawUrl.includes('kko.to')
+  );
+  if (isShortUrl) {
     try {
       const resp = await fetch(rawUrl, { redirect: 'follow' });
       const coords = extractCoordsFromUrl(resp.url);
@@ -95,14 +97,27 @@ async function resolveItemCoords(item: ItineraryItem, service: any): Promise<Geo
     } catch {}
   }
 
-  // 3. location 地址文字（去掉 URL 後剩餘的純文字）
+  // 2. 直接從長網址提取座標（含 @lat,lng 等格式）
+  const fromUrl = extractCoordsFromUrl(locUrl) || extractCoordsFromUrl(loc);
+  if (fromUrl) return fromUrl;
+
+  // 3. 非短網址的其他 URL → 也嘗試追蹤轉址
+  if (rawUrl && !isShortUrl) {
+    try {
+      const resp = await fetch(rawUrl, { redirect: 'follow' });
+      const coords = extractCoordsFromUrl(resp.url);
+      if (coords) return coords;
+    } catch {}
+  }
+
+  // 4. location 地址文字（去掉 URL 後剩餘的純文字）
   const addrText = extractAddrText(loc);
   if (addrText) {
     const hit = await googleTextSearch(service, addrText);
     if (hit) return hit;
   }
 
-  // 4. 行程名稱（最後備用）
+  // 5. 行程名稱（最後備用）
   if (item.title.trim()) {
     const hit = await googleTextSearch(service, item.title.trim());
     if (hit) return hit;
