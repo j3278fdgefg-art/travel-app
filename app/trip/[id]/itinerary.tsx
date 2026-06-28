@@ -231,7 +231,7 @@ function saveItemTypes(userId: string, list: string[]) {
 
 
 const emptyForm = () => ({
-  time: '', title: '', location: '', locationUrl: '', note: '',
+  time: '', title: '', location: '', locationUrl: '', address: '', note: '',
   type: '📸',
 });
 
@@ -394,6 +394,7 @@ export default function ItineraryScreen() {
       title: item.title,
       location: item.location || '',
       locationUrl: item.location_url || '',
+      address: item.address || '',
       note: item.note || '',
       type: item.type,
     });
@@ -411,6 +412,7 @@ export default function ItineraryScreen() {
       await updateItineraryItem(editingItem.id, {
         time: form.time, title: form.title, location: form.location,
         location_url: form.locationUrl,
+        address: form.address || undefined,
         note: form.note, type: toDbType(form.type) as any,
       });
     } else {
@@ -418,6 +420,7 @@ export default function ItineraryScreen() {
         trip_id: id, day_id: day.id,
         time: form.time, title: form.title, location: form.location,
         location_url: form.locationUrl,
+        address: form.address || undefined,
         note: form.note, type: toDbType(form.type) as any,
         order_index: currentDayItems.length,
       });
@@ -430,9 +433,7 @@ export default function ItineraryScreen() {
   };
 
   const openInMap = (item: ItineraryItem) => {
-    // 優先用 title（店名）讓 Places textSearch 找到完整店家資訊卡
-    // 地址文字只在 title 為空時才用
-    const q = item.title.trim() ||
+    const q = item.address?.trim() || item.title.trim() ||
       (item.location || '').replace(/https?:\/\/\S+/g, '').replace(/[，,]\s*$/, '').trim();
     if (q) router.push(`/trip/${id}/map?q=${encodeURIComponent(q)}` as any);
   };
@@ -712,6 +713,15 @@ export default function ItineraryScreen() {
                 <Text style={styles.urlDetectedText}>已辨識 Google 地圖連結：{form.location}</Text>
               </View>
             )}
+
+            <Text style={styles.label}>地址（用於地圖查找）</Text>
+            <TextInput
+              style={styles.input}
+              value={form.address}
+              onChangeText={(v) => setField('address', v)}
+              placeholder="台北市大安區敦化南路二段..."
+              placeholderTextColor={Colors.textLight}
+            />
 
             <Text style={styles.label}>備注</Text>
             <TextInput style={[styles.input, { height: 72 }]} value={form.note} onChangeText={(v) => setField('note', v)} placeholder="..." placeholderTextColor={Colors.textLight} multiline />
