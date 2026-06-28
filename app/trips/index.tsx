@@ -47,6 +47,7 @@ export default function TripsScreen() {
   const [selectedEmoji, setSelectedEmoji] = useState('✈️');
   const [creating, setCreating] = useState(false);
   const [tripEmojis, setTripEmojis] = useState(DEFAULT_TRIP_EMOJIS);
+  const [favManageVisible, setFavManageVisible] = useState(false);
   const [addingEmoji, setAddingEmoji] = useState(false);
   const [newEmojiInput, setNewEmojiInput] = useState('');
 
@@ -144,6 +145,20 @@ export default function TripsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
+      {/* 收藏分類管理快捷方格 */}
+      <TouchableOpacity style={styles.favMgmtBox} onPress={() => {
+        if (trips.length === 0) { alert('請先建立旅程'); return; }
+        if (trips.length === 1) { setCurrentTrip(trips[0]); router.push(`/trip/${trips[0].id}/map` as any); return; }
+        setFavManageVisible(true);
+      }}>
+        <Text style={styles.favMgmtEmoji}>❤️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.favMgmtTitle}>收藏分類管理</Text>
+          <Text style={styles.favMgmtSub}>整理各旅程的收藏地點</Text>
+        </View>
+        <Text style={styles.favMgmtArrow}>›</Text>
+      </TouchableOpacity>
+
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>我的旅程</Text>
@@ -183,11 +198,36 @@ export default function TripsScreen() {
         <Text style={styles.fabText}>+ 新增旅程</Text>
       </TouchableOpacity>
 
+      {/* 旅程選擇 Modal（收藏分類管理用） */}
+      <Modal visible={favManageVisible} animationType="slide" transparent>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFavManageVisible(false)}>
+          <View style={styles.favManageSheet}>
+            <Text style={styles.favManageTitle}>選擇旅程</Text>
+            {trips.map((t) => (
+              <TouchableOpacity key={t.id} style={styles.favManageRow} onPress={() => {
+                setFavManageVisible(false);
+                setCurrentTrip(t);
+                router.push(`/trip/${t.id}/map` as any);
+              }}>
+                <Text style={styles.favManageEmoji}>{t.cover_emoji}</Text>
+                <Text style={styles.favManageName} numberOfLines={1}>{t.name}</Text>
+                <Text style={styles.favMgmtArrow}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>建立新旅程</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>建立新旅程</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.label}>選擇圖示</Text>
             <View style={styles.emojiRow}>
@@ -252,9 +292,6 @@ export default function TripsScreen() {
             )}
 
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>取消</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.createBtn} onPress={handleCreate} disabled={creating}>
                 {creating ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>建立</Text>}
               </TouchableOpacity>
@@ -317,4 +354,16 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
   createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
+  favMgmtBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card, marginHorizontal: 20, marginTop: 12, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16, gap: 12, shadowColor: Colors.shadow, shadowOpacity: 1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  favMgmtEmoji: { fontSize: 26 },
+  favMgmtTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  favMgmtSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  favMgmtArrow: { fontSize: 22, color: Colors.textLight },
+  favManageSheet: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20, paddingBottom: 40, paddingHorizontal: 20 },
+  favManageTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
+  favManageRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 12 },
+  favManageEmoji: { fontSize: 24 },
+  favManageName: { flex: 1, fontSize: 15, color: Colors.text },
 });

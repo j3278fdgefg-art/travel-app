@@ -180,6 +180,10 @@ export default function MapScreen() {
   const [showFav, setShowFav] = useState(false);
   const [showRoute, setShowRoute] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [favCatFilter, setFavCatFilter] = useState<string>('all');
+  const [favPickerVisible, setFavPickerVisible] = useState(false);
+  const [favPickerInput, setFavPickerInput] = useState('');
+  const [pendingFavPlace, setPendingFavPlace] = useState<any | null>(null);
   const DRAWER_W = 290;
   const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
   const favX = useRef(new Animated.Value(DRAWER_W)).current;
@@ -506,15 +510,30 @@ export default function MapScreen() {
       return next;
     });
   };
-  const addFavHeader = () => {
-    const t = window.prompt('輸入標題名稱');
-    if (t?.trim()) addFavorite({ trip_id: id, name: t.trim(), is_header: true } as any);
-  };
+  const uniqueCategories = Array.from(new Set(
+    favorites.filter((f) => !f.is_header && f.category).map((f) => f.category as string)
+  ));
+  const filteredFavs = favorites.filter((f) => {
+    if (f.is_header) return false;
+    if (favCatFilter === 'all') return true;
+    if (favCatFilter === '') return !f.category;
+    return f.category === favCatFilter;
+  });
   const findFav = (p: any) => favorites.find((f) => !f.is_header && ((p.placeId && f.place_id === p.placeId) || f.name === p.name));
   const toggleFav = (p: any) => {
     const existing = findFav(p);
     if (existing) { removeFavorite(existing.id); return; }
-    addFavorite({ trip_id: id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, place_id: p.placeId });
+    setPendingFavPlace(p);
+    setFavPickerInput('');
+    setFavPickerVisible(true);
+  };
+  const confirmFav = (category: string) => {
+    if (!pendingFavPlace) return;
+    const p = pendingFavPlace;
+    addFavorite({ trip_id: id, name: p.name, address: p.address, lat: p.lat, lng: p.lng, place_id: p.placeId, category: category || undefined } as any);
+    setPendingFavPlace(null);
+    setFavPickerVisible(false);
+    setFavPickerInput('');
   };
 
   // 導航：優先喚起 Google 地圖 APP；APP 一開啟就取消網頁版 fallback（回到 App 不會卡在網頁地圖）
@@ -756,50 +775,40 @@ export default function MapScreen() {
         <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: favX }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>❤️ 收藏清單</Text>
-            <TouchableOpacity style={styles.favAddHeader} onPress={addFavHeader}>
-              <Text style={styles.favAddHeaderText}>＋ 標題</Text>
-            </TouchableOpacity>
             <View style={{ flex: 1 }} />
             <Text style={styles.panelCount}>{favorites.filter((f) => !f.is_header).length} 個</Text>
             <TouchableOpacity style={styles.drawerClose} onPress={() => setShowFav(false)}>
               <Text style={styles.drawerCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
-          {favorites.length === 0 ? (
-            <Text style={styles.favEmpty}>還沒有收藏。{'\n'}點地圖上的店家，按 🤍 即可收藏。</Text>
+          {/* 分類篩選 chips */}
+          {uniqueCategories.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catFilterRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
+              {(['all', '', ...uniqueCategories] as string[]).map((cat, idx) => (
+                <TouchableOpacity key={idx} style={[styles.catFilterChip, favCatFilter === cat && styles.catFilterChipActive]} onPress={() => setFavCatFilter(cat)}>
+                  <Text style={[styles.catFilterText, favCatFilter === cat && styles.catFilterTextActive]}>
+                    {cat === 'all' ? '全部' : cat === '' ? '未分類' : cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          {filteredFavs.length === 0 ? (
+            <Text style={styles.favEmpty}>{favorites.filter((f) => !f.is_header).length === 0 ? '還沒有收藏。\n點地圖上的店家，按 🤍 即可收藏。' : '此分類沒有收藏。'}</Text>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
-              {favorites.map((f, idx) => {
-                if (f.is_header) {
-                  const collapsed = collapsedSections.has(f.id);
-                  return (
-                    <TouchableOpacity key={f.id} style={styles.favSectionHeader} onPress={() => toggleSection(f.id)}>
-                      <Text style={styles.favSectionText}>{f.name}</Text>
-                      <Text style={styles.favSectionChevron}>{collapsed ? '▶' : '▼'}</Text>
-                      <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
-                        <Text style={{ fontSize: 13 }}>🗑️</Text>
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  );
-                }
-                // 找最近的上層標題，若標題已收合則隱藏
-                let parentHeader: typeof f | undefined;
-                for (let i = idx - 1; i >= 0; i--) {
-                  if (favorites[i].is_header) { parentHeader = favorites[i]; break; }
-                }
-                if (parentHeader && collapsedSections.has(parentHeader.id)) return null;
-                return (
-                  <View key={f.id} style={styles.placeRow}>
-                    <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => showFavOnMap(f)}>
-                      <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
-                      {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
-                      <Text style={{ fontSize: 13 }}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+              {filteredFavs.map((f) => (
+                <View key={f.id} style={styles.placeRow}>
+                  <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => showFavOnMap(f)}>
+                    <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
+                    {!!f.category && <Text style={[styles.placeCat, { color: Colors.primary }]} numberOfLines={1}>#{f.category}</Text>}
+                    {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
+                    <Text style={{ fontSize: 13 }}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
             </ScrollView>
           )}
         </Animated.View>
@@ -828,6 +837,37 @@ export default function MapScreen() {
                 <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
+            {/* 分類選擇器（點 🤍 後彈出） */}
+            {favPickerVisible && pendingFavPlace && (
+              <View style={styles.catPickerBar}>
+                <Text style={styles.catPickerTitle}>加入收藏 — 選擇分類</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                  <TouchableOpacity style={styles.catChip} onPress={() => confirmFav('')}>
+                    <Text style={styles.catChipText}>無分類</Text>
+                  </TouchableOpacity>
+                  {uniqueCategories.map((cat) => (
+                    <TouchableOpacity key={cat} style={[styles.catChip, { backgroundColor: Colors.primary }]} onPress={() => confirmFav(cat)}>
+                      <Text style={[styles.catChipText, { color: '#fff' }]}>{cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={styles.catPickerInput}
+                    value={favPickerInput}
+                    onChangeText={setFavPickerInput}
+                    placeholder="新分類名稱..."
+                    placeholderTextColor={Colors.textLight}
+                  />
+                  <TouchableOpacity style={styles.catPickerConfirm} onPress={() => confirmFav(favPickerInput.trim())}>
+                    <Text style={styles.catPickerConfirmText}>確認</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => { setFavPickerVisible(false); setPendingFavPlace(null); }}>
+                  <Text style={styles.catPickerCancel}>取消</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
               {place.photos?.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
@@ -969,11 +1009,22 @@ const styles = StyleSheet.create({
   openGmapText: { fontSize: 18 },
   favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
   favRemove: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
-  favAddHeader: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: Colors.primary + '20', borderRadius: 8, marginLeft: 8 },
-  favAddHeaderText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   favSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.primary + '15', borderRadius: 10 },
   favSectionText: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.primary },
   favSectionChevron: { fontSize: 11, color: Colors.primary },
+  catFilterRow: { maxHeight: 44, flexShrink: 0 },
+  catFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border, borderWidth: 1, borderColor: Colors.border },
+  catFilterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  catFilterText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  catFilterTextActive: { color: '#fff' },
+  catPickerBar: { padding: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.background },
+  catPickerTitle: { fontSize: 13, fontWeight: '700', color: Colors.text, marginBottom: 4 },
+  catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border, marginRight: 8 },
+  catChipText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
+  catPickerInput: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 10, fontSize: 14, color: Colors.text, backgroundColor: Colors.card },
+  catPickerConfirm: { paddingHorizontal: 16, height: 38, borderRadius: 10, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  catPickerConfirmText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  catPickerCancel: { textAlign: 'center', color: Colors.textSecondary, marginTop: 10, fontSize: 13 },
   placeCardName: { flex: 1, fontSize: 18, fontWeight: '700', color: Colors.text },
   placeMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   placeMeta: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },

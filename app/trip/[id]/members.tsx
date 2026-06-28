@@ -367,7 +367,12 @@ export default function MembersScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.9 }]}>
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.modalTitle}>{editingMember ? '編輯成員' : '新增成員'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingMember ? '編輯成員' : '新增成員'}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.label}>成員名稱 *</Text>
             <TextInput
@@ -451,9 +456,6 @@ export default function MembersScreen() {
             </View>
 
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>取消</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.createBtn} onPress={handleSave}>
                 <Text style={styles.createText}>{editingMember ? '儲存' : '新增'}</Text>
               </TouchableOpacity>
@@ -538,4 +540,6 @@ const styles = StyleSheet.create({
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   leaveBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 10 },
   leaveText: { color: Colors.danger, fontSize: 14 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
 });

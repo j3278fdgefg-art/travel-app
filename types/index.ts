@@ -107,6 +107,7 @@ export interface Favorite {
   place_id?: string;
   note?: string;
   is_header?: boolean;
+  category?: string;
   created_at: string;
 }
 

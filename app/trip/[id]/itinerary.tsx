@@ -618,7 +618,12 @@ export default function ItineraryScreen() {
         <View style={[styles.modalOverlay, { paddingBottom: kbOffset }]}>
           <View style={[styles.modalWrapper, { maxHeight: (winHeight - kbOffset) * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.addTabs}>
               <TouchableOpacity style={[styles.addTab, addTab === 'manual' && styles.addTabActive]} onPress={() => setAddTab('manual')}>
@@ -745,9 +750,6 @@ export default function ItineraryScreen() {
 
             {addTab === 'manual' && (
               <View style={styles.modalBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.cancelText}>取消</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={styles.createBtn} onPress={handleSave}>
                   <Text style={styles.createText}>{editingItem ? '儲存' : '新增'}</Text>
                 </TouchableOpacity>
@@ -907,4 +909,6 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
   createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
 });

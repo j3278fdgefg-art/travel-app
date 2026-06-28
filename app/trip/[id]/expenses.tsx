@@ -460,7 +460,12 @@ export default function ExpensesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.label}>類別</Text>
             <View style={styles.catRow}>
@@ -560,9 +565,6 @@ export default function ExpensesScreen() {
             <TextInput style={[styles.input, { height: 72, textAlignVertical: 'top', paddingTop: 10 }]} value={form.note} onChangeText={(v) => setField('note', v)} placeholder="補充說明..." placeholderTextColor={Colors.textLight} multiline />
 
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>取消</Text>
-              </TouchableOpacity>
               <TouchableOpacity style={styles.createBtn} onPress={handleSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>{editingExpense ? '儲存' : '新增'}</Text>}
               </TouchableOpacity>
@@ -682,4 +684,6 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
   createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
 });
