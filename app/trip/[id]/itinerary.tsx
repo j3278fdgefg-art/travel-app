@@ -259,6 +259,7 @@ export default function ItineraryScreen() {
   const [itemWeatherCache, setItemWeatherCache] = useState<Record<string, DayWeather | null>>({});
   const fetchingWeatherRef = useRef(new Set<string>());
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [kbOffset, setKbOffset] = useState(0);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -269,6 +270,16 @@ export default function ItineraryScreen() {
   useEffect(() => {
     if (user) setItemTypes(loadItemTypes(user.id));
   }, [user]);
+
+  // 手機鍵盤彈出時用 visualViewport 偵測高度差，把 modal 往上推
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const handler = () => setKbOffset(Math.max(0, window.innerHeight - vv.height));
+    vv.addEventListener('resize', handler);
+    return () => vv.removeEventListener('resize', handler);
+  }, []);
 
   useEffect(() => {
     const dest = currentTrip?.destination || currentTrip?.name;
@@ -604,8 +615,8 @@ export default function ItineraryScreen() {
       </TouchableOpacity>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.9 }]}>
+        <View style={[styles.modalOverlay, { paddingBottom: kbOffset }]}>
+          <View style={[styles.modalWrapper, { maxHeight: (winHeight - kbOffset) * 0.92 }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
 

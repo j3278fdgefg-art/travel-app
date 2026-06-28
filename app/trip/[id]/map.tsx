@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated,
+  SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated, useWindowDimensions,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
@@ -151,6 +151,10 @@ export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string; placeId?: string }>();
   const { currentTrip, days, items, fetchTripById, fetchDays, fetchItems, favorites, fetchFavorites, addFavorite, removeFavorite } = useTripStore();
   const { googleMapsApiKey } = useSettingsStore();
+  const { width: winWidth } = useWindowDimensions();
+  // 資訊卡最寬 430px，超過後靠左貼齊 (left:12)，right 值動態收縮
+  const SHEET_MAX_W = 430;
+  const sheetRight = Math.max(68, winWidth - 12 - SHEET_MAX_W);
   const id = params.id || currentTrip?.id || '';
   const iframeRef = useRef<any>(null);
 
@@ -802,7 +806,7 @@ export default function MapScreen() {
 
         {/* 店家完整資訊卡（收合時整張隱藏，靠右側 ℹ️ 展開；點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && !placeCollapsed && (
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { right: sheetRight }]}>
             {/* 標題列常駐 */}
             <View style={styles.placeHeaderBar}>
               <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
@@ -882,7 +886,7 @@ export default function MapScreen() {
 
         {/* App 內路線面板（可收合，不擋地圖） */}
         {route && (
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { right: sheetRight }]}>
             <View style={styles.routeHeader}>
               <Text style={styles.routeSummary}>{route.duration} · {route.distance}</Text>
               <View style={{ flex: 1 }} />
