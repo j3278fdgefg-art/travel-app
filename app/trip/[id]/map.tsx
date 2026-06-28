@@ -99,11 +99,23 @@ async function resolveItemCoords(item: ItineraryItem, service: any): Promise<Geo
     rawUrl.includes('kko.to')
   );
   if (isShortUrl) {
+    let resolvedUrl = '';
+    // 透過 server-side proxy 轉址（避開瀏覽器 CORS 限制）
     try {
-      const resp = await fetch(rawUrl, { redirect: 'follow' });
-      const coords = extractCoordsFromUrl(resp.url);
-      if (coords) return coords;
+      const apiResp = await fetch(`/api/resolve-url?url=${encodeURIComponent(rawUrl)}`);
+      if (apiResp.ok) resolvedUrl = ((await apiResp.json()) as { url?: string }).url ?? '';
     } catch {}
+    // 本地開發備用：直接 fetch（部署後不走這條）
+    if (!resolvedUrl) {
+      try {
+        const resp = await fetch(rawUrl, { redirect: 'follow' });
+        resolvedUrl = resp.url;
+      } catch {}
+    }
+    if (resolvedUrl) {
+      const coords = extractCoordsFromUrl(resolvedUrl);
+      if (coords) return coords;
+    }
   }
 
   // 2. 直接從長網址提取座標（含 @lat,lng 等格式）
