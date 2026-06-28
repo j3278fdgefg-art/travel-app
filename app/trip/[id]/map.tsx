@@ -175,6 +175,7 @@ export default function MapScreen() {
 
   const [showFav, setShowFav] = useState(false);
   const [showRoute, setShowRoute] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const DRAWER_W = 290;
   const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
   const favX = useRef(new Animated.Value(DRAWER_W)).current;
@@ -494,7 +495,18 @@ export default function MapScreen() {
   };
 
   // 收藏
-  const findFav = (p: any) => favorites.find((f) => (p.placeId && f.place_id === p.placeId) || f.name === p.name);
+  const toggleSection = (headerId: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(headerId)) next.delete(headerId); else next.add(headerId);
+      return next;
+    });
+  };
+  const addFavHeader = () => {
+    const t = window.prompt('輸入標題名稱');
+    if (t?.trim()) addFavorite({ trip_id: id, name: t.trim(), is_header: true } as any);
+  };
+  const findFav = (p: any) => favorites.find((f) => !f.is_header && ((p.placeId && f.place_id === p.placeId) || f.name === p.name));
   const toggleFav = (p: any) => {
     const existing = findFav(p);
     if (existing) { removeFavorite(existing.id); return; }
@@ -542,6 +554,11 @@ export default function MapScreen() {
   const showOnMap = async (item: ItineraryItem) => {
     setShowPanel(false);
     setSearch(item.title);
+    // 行程綁定了收藏的 place_id → 直接跳資訊卡，不走 textSearch
+    if (item.place_id && placesRef.current) {
+      showPlaceDetails(item.place_id);
+      return;
+    }
     if (!placesRef.current) {
       const coords = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
       setQuery(coords ? `${coords.latitude},${coords.longitude}` : buildSearchQuery(item));
@@ -735,8 +752,11 @@ export default function MapScreen() {
         <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: favX }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>❤️ 收藏清單</Text>
+            <TouchableOpacity style={styles.favAddHeader} onPress={addFavHeader}>
+              <Text style={styles.favAddHeaderText}>＋ 標題</Text>
+            </TouchableOpacity>
             <View style={{ flex: 1 }} />
-            <Text style={styles.panelCount}>共 {favorites.length} 個</Text>
+            <Text style={styles.panelCount}>{favorites.filter((f) => !f.is_header).length} 個</Text>
             <TouchableOpacity style={styles.drawerClose} onPress={() => setShowFav(false)}>
               <Text style={styles.drawerCloseText}>✕</Text>
             </TouchableOpacity>
@@ -745,17 +765,37 @@ export default function MapScreen() {
             <Text style={styles.favEmpty}>還沒有收藏。{'\n'}點地圖上的店家，按 🤍 即可收藏。</Text>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, gap: 9 }}>
-              {favorites.map((f) => (
-                <View key={f.id} style={styles.placeRow}>
-                  <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => showFavOnMap(f)}>
-                    <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
-                    {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
-                    <Text style={{ fontSize: 13 }}>🗑️</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {favorites.map((f, idx) => {
+                if (f.is_header) {
+                  const collapsed = collapsedSections.has(f.id);
+                  return (
+                    <TouchableOpacity key={f.id} style={styles.favSectionHeader} onPress={() => toggleSection(f.id)}>
+                      <Text style={styles.favSectionText}>{f.name}</Text>
+                      <Text style={styles.favSectionChevron}>{collapsed ? '▶' : '▼'}</Text>
+                      <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
+                        <Text style={{ fontSize: 13 }}>🗑️</Text>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                }
+                // 找最近的上層標題，若標題已收合則隱藏
+                let parentHeader: typeof f | undefined;
+                for (let i = idx - 1; i >= 0; i--) {
+                  if (favorites[i].is_header) { parentHeader = favorites[i]; break; }
+                }
+                if (parentHeader && collapsedSections.has(parentHeader.id)) return null;
+                return (
+                  <View key={f.id} style={styles.placeRow}>
+                    <TouchableOpacity style={{ flex: 1, minWidth: 0 }} activeOpacity={0.7} onPress={() => showFavOnMap(f)}>
+                      <Text style={styles.placeName} numberOfLines={1}>{f.name}</Text>
+                      {!!f.address && <Text style={styles.placeCat} numberOfLines={1}>{f.address}</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeFavorite(f.id)} style={styles.favRemove}>
+                      <Text style={{ fontSize: 13 }}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </ScrollView>
           )}
         </Animated.View>
@@ -912,6 +952,11 @@ const styles = StyleSheet.create({
   favHeart: { padding: 4 },
   favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
   favRemove: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
+  favAddHeader: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: Colors.primary + '20', borderRadius: 8, marginLeft: 8 },
+  favAddHeaderText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+  favSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.primary + '15', borderRadius: 10 },
+  favSectionText: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.primary },
+  favSectionChevron: { fontSize: 11, color: Colors.primary },
   placeCardName: { flex: 1, fontSize: 18, fontWeight: '700', color: Colors.text },
   placeMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   placeMeta: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },

@@ -375,11 +375,18 @@ export default function ItineraryScreen() {
     setModalVisible(true);
   };
 
-  // 從收藏清單選一個地點 → 自動帶入名稱、地點、place_id（地圖直接跳資訊卡）
+  // 從收藏清單選一個地點 → 自動帶入名稱、地址、place_id（地圖直接跳資訊卡）
   const pickFavorite = (f: { name: string; address?: string; lat?: number; lng?: number; place_id?: string }) => {
     const url = f.lat != null && f.lng != null ? `https://maps.google.com/?q=${f.lat},${f.lng}` : '';
-    setForm((prev) => ({ ...prev, title: f.name, location: f.address || f.name, locationUrl: url, placeId: f.place_id || '' }));
-    setLocationInput(f.address || f.name);
+    setForm((prev) => ({
+      ...prev,
+      title: f.name,
+      location: f.name,        // 地點欄填地標名稱
+      locationUrl: url,
+      address: f.address || '', // 地址欄填實際地址
+      placeId: f.place_id || '',
+    }));
+    setLocationInput(f.name);
     setUrlDetected(false);
     setAddTab('manual');
   };
@@ -613,18 +620,25 @@ export default function ItineraryScreen() {
 
             {addTab === 'favorite' && (
               <View style={{ marginTop: 4 }}>
-                {favorites.length === 0 ? (
+                {favorites.filter((f) => !f.is_header).length === 0 ? (
                   <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
-                ) : favorites.map((f) => (
-                  <TouchableOpacity key={f.id} style={styles.favPickRow} onPress={() => pickFavorite(f)}>
-                    <Text style={styles.favPickIcon}>❤️</Text>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.favPickName} numberOfLines={1}>{f.name}</Text>
-                      {!!f.address && <Text style={styles.favPickAddr} numberOfLines={1}>{f.address}</Text>}
-                    </View>
-                    <Text style={styles.favPickArrow}>帶入 →</Text>
-                  </TouchableOpacity>
-                ))}
+                ) : favorites.map((f) => {
+                  if (f.is_header) {
+                    return (
+                      <Text key={f.id} style={styles.favPickSection}>{f.name}</Text>
+                    );
+                  }
+                  return (
+                    <TouchableOpacity key={f.id} style={styles.favPickRow} onPress={() => pickFavorite(f)}>
+                      <Text style={styles.favPickIcon}>❤️</Text>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.favPickName} numberOfLines={1}>{f.name}</Text>
+                        {!!f.address && <Text style={styles.favPickAddr} numberOfLines={1}>{f.address}</Text>}
+                      </View>
+                      <Text style={styles.favPickArrow}>帶入 →</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
@@ -867,6 +881,7 @@ const styles = StyleSheet.create({
   addTabText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '600' },
   addTabTextActive: { color: '#fff' },
   favPickEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 24, lineHeight: 20 },
+  favPickSection: { fontSize: 12, fontWeight: '700', color: Colors.primary, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 4 },
   favPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, backgroundColor: Colors.background, marginBottom: 8 },
   favPickIcon: { fontSize: 16 },
   favPickName: { fontSize: 15, fontWeight: '600', color: Colors.text },

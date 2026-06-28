@@ -106,6 +106,7 @@ export interface Favorite {
   lng?: number;
   place_id?: string;
   note?: string;
+  is_header?: boolean;
   created_at: string;
 }
 
