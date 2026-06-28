@@ -178,7 +178,7 @@ export default function MapScreen() {
   const [showPanel, setShowPanel] = useState(false);
 
   const [showFav, setShowFav] = useState(false);
-  const [showRoute, setShowRoute] = useState(true);
+  const [showRoute, setShowRoute] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [favCatFilter, setFavCatFilter] = useState<string>('all');
   const [favPickerVisible, setFavPickerVisible] = useState(false);
@@ -202,7 +202,10 @@ export default function MapScreen() {
   const polylineRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const drawGenRef = useRef(0);
-  const showRouteRef = useRef(true);
+  const showRouteRef = useRef(false);
+  const [showFavMarkers, setShowFavMarkers] = useState(true);
+  const showFavMarkersRef = useRef(true);
+  const favMarkersRef = useRef<any[]>([]);
   const searchMarkerRef = useRef<any>(null);
   const pendingQRef = useRef<string | null>(null);
   const pendingPlaceIdRef = useRef<string | null>(null);
@@ -354,6 +357,42 @@ export default function MapScreen() {
     polylineRef.current?.setMap(m);
     dirRendererRef.current?.setMap(m);
   }, [showRoute]);
+
+  // 切換收藏愛心標記顯示
+  useEffect(() => {
+    showFavMarkersRef.current = showFavMarkers;
+    const m = showFavMarkers ? mapRef.current : null;
+    favMarkersRef.current.forEach((mk) => mk.setMap(m));
+  }, [showFavMarkers]);
+
+  // 繪製收藏愛心標記
+  useEffect(() => {
+    if (!gLoaded || !mapRef.current) return;
+    const g = (window as any).google;
+    favMarkersRef.current.forEach((m) => m.setMap(null));
+    favMarkersRef.current = [];
+    favorites.filter((f) => !f.is_header && f.lat != null && f.lng != null).forEach((f) => {
+      const marker = new g.maps.Marker({
+        position: { lat: f.lat!, lng: f.lng! },
+        map: showFavMarkersRef.current ? mapRef.current : null,
+        title: f.name,
+        icon: {
+          path: g.maps.SymbolPath.CIRCLE,
+          scale: 14,
+          fillColor: '#FF4D6D',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+        },
+        label: { text: '♥', color: '#fff', fontSize: '13px', fontWeight: '700' },
+      });
+      marker.addListener('click', () => {
+        if (f.place_id && placesRef.current) showPlaceDetails(f.place_id);
+        else if (f.lat != null && f.lng != null) markAt(f.lat, f.lng, f.name);
+      });
+      favMarkersRef.current.push(marker);
+    });
+  }, [gLoaded, favorites]);
 
   // query 改變 → 平移地圖（點地點卡片 / 定位）
   useEffect(() => {
@@ -715,6 +754,9 @@ export default function MapScreen() {
           <TouchableOpacity style={[styles.ctrlBtn, showFav && styles.ctrlBtnActive]} onPress={() => { setShowFav((v) => !v); setShowPanel(false); }}>
             <Text style={styles.ctrlBtnEmoji}>{showFav ? '❤️' : '🤍'}</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.ctrlBtn, !showFavMarkers && styles.ctrlBtnDim]} onPress={() => setShowFavMarkers((v) => !v)}>
+            <Text style={[styles.ctrlBtnEmoji, { color: '#FF4D6D' }]}>♥</Text>
+          </TouchableOpacity>
           {locationItems.length > 0 && (
             <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => { setShowPanel((v) => !v); setShowFav(false); }}>
               <Text style={styles.ctrlBtnEmoji}>📋</Text>
@@ -816,11 +858,14 @@ export default function MapScreen() {
         {/* 店家完整資訊卡（收合時整張隱藏，靠右側 ℹ️ 展開；點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && !placeCollapsed && (
           <View style={[styles.sheet, { right: sheetRight }]}>
-            {/* 標題列常駐 */}
-            <View style={styles.placeHeaderBar}>
-              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
+            {/* 頂部操作列：關閉 ✕（左）＋ 開啟 Google Maps 🗺️（右） */}
+            <View style={styles.placeActionBar}>
+              <TouchableOpacity onPress={closePlace} style={styles.placeActionBtn}>
+                <Text style={styles.drawerCloseText}>✕</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }} />
               <TouchableOpacity
-                style={styles.openGmapBtn}
+                style={styles.placeActionBtn}
                 onPress={() => {
                   const url = place.placeId
                     ? `https://www.google.com/maps/place/?q=place_id:${place.placeId}`
@@ -830,11 +875,12 @@ export default function MapScreen() {
               >
                 <Text style={styles.openGmapText}>🗺️</Text>
               </TouchableOpacity>
+            </View>
+            {/* 標題列常駐 */}
+            <View style={styles.placeHeaderBar}>
+              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
               <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                 <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={closePlace} style={[styles.drawerClose, { marginLeft: 6 }]}>
-                <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
             {/* 分類選擇器（點 🤍 後彈出） */}
@@ -1007,6 +1053,8 @@ const styles = StyleSheet.create({
   favHeart: { padding: 4 },
   openGmapBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
   openGmapText: { fontSize: 18 },
+  placeActionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  placeActionBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
   favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
   favRemove: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
   favSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.primary + '15', borderRadius: 10 },

@@ -130,7 +130,6 @@ export default function BookingsScreen() {
   const arrHourRef = useRef<any>(null);
   const arrMinRef = useRef<any>(null);
   const seatRef = useRef<any>(null);
-  const amountRef = useRef<any>(null);
   const noteRef = useRef<any>(null);
 
   const myMemberName = members.find((m) => m.user_id === user?.id)?.display_name || '';
@@ -439,7 +438,7 @@ export default function BookingsScreen() {
           style={styles.input} value={form.seat_number}
           onChangeText={(v) => setField('seat_number', v)}
           placeholder="21A / 22B" placeholderTextColor={Colors.textLight}
-          returnKeyType="next" onSubmitEditing={() => amountRef.current?.focus()}
+          returnKeyType="next" onSubmitEditing={() => noteRef.current?.focus()}
         />
       </>
     );
@@ -621,25 +620,6 @@ export default function BookingsScreen() {
             </View>
 
             {renderForm()}
-
-            <View style={styles.rowFields}>
-              <View style={{ flex: 2 }}>
-                <Text style={styles.label}>金額</Text>
-                <TextInput
-                  ref={amountRef}
-                  style={styles.input} value={form.amount}
-                  onChangeText={(v) => setField('amount', v)}
-                  placeholder="13947" placeholderTextColor={Colors.textLight}
-                  keyboardType="numeric"
-                  returnKeyType="next" onSubmitEditing={() => noteRef.current?.focus()}
-                />
-              </View>
-              <View style={{ width: 10 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>幣別</Text>
-                <TextInput style={styles.input} value={form.currency} onChangeText={(v) => setField('currency', v.toUpperCase())} placeholder="TWD" placeholderTextColor={Colors.textLight} autoCapitalize="characters" maxLength={3} />
-              </View>
-            </View>
 
             <Text style={styles.label}>備注</Text>
             <TextInput
