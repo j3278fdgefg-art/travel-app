@@ -145,25 +145,18 @@ export default function TripsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
-      {/* 收藏分類管理快捷方格 */}
-      <TouchableOpacity style={styles.favMgmtBox} onPress={() => {
-        if (trips.length === 0) { alert('請先建立旅程'); return; }
-        if (trips.length === 1) { setCurrentTrip(trips[0]); router.push(`/trip/${trips[0].id}/map` as any); return; }
-        setFavManageVisible(true);
-      }}>
-        <Text style={styles.favMgmtEmoji}>❤️</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.favMgmtTitle}>收藏分類管理</Text>
-          <Text style={styles.favMgmtSub}>整理各旅程的收藏地點</Text>
-        </View>
-        <Text style={styles.favMgmtArrow}>›</Text>
-      </TouchableOpacity>
-
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>我的旅程</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={() => {
+            if (trips.length === 0) { alert('請先建立旅程'); return; }
+            if (trips.length === 1) { setCurrentTrip(trips[0]); router.push(`/trip/${trips[0].id}/favorites` as any); return; }
+            setFavManageVisible(true);
+          }} style={styles.signOutBtn}>
+            <Ionicons name="heart-outline" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.signOutBtn}>
             <Ionicons name="share-social-outline" size={18} color={Colors.textSecondary} />
           </TouchableOpacity>
@@ -207,7 +200,7 @@ export default function TripsScreen() {
               <TouchableOpacity key={t.id} style={styles.favManageRow} onPress={() => {
                 setFavManageVisible(false);
                 setCurrentTrip(t);
-                router.push(`/trip/${t.id}/map` as any);
+                router.push(`/trip/${t.id}/favorites` as any);
               }}>
                 <Text style={styles.favManageEmoji}>{t.cover_emoji}</Text>
                 <Text style={styles.favManageName} numberOfLines={1}>{t.name}</Text>

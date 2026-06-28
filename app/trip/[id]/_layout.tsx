@@ -28,6 +28,7 @@ export default function TripLayout() {
       <Tabs.Screen name="expenses" options={{ title: '記帳', tabBarIcon: tabEmoji('💰') }} />
       <Tabs.Screen name="checklist" options={{ title: '準備', tabBarIcon: tabEmoji('✅') }} />
       <Tabs.Screen name="members" options={{ title: '成員', tabBarIcon: tabEmoji('👥') }} />
+      <Tabs.Screen name="favorites" options={{ href: null }} />
     </Tabs>
   );
 }
