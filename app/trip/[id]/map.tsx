@@ -62,12 +62,21 @@ function loadGoogleMaps(key: string): Promise<void> {
 type GeoHit = { latitude: number; longitude: number; placeId?: string };
 
 // Google 地點文字搜尋 → 座標 + place_id
-function googleTextSearch(service: any, query: string): Promise<GeoHit | null> {
+function googleTextSearch(
+  service: any,
+  query: string,
+  locationBias?: { latitude: number; longitude: number },
+): Promise<GeoHit | null> {
   return new Promise((resolve) => {
     if (!query || !service) return resolve(null);
     try {
-      service.textSearch({ query }, (results: any, status: any) => {
-        const g = (window as any).google;
+      const g = (window as any).google;
+      const opts: any = { query };
+      if (locationBias) {
+        opts.location = new g.maps.LatLng(locationBias.latitude, locationBias.longitude);
+        opts.radius = 2000;
+      }
+      service.textSearch(opts, (results: any, status: any) => {
         if (status === g.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry?.location) {
           const loc = results[0].geometry.location;
           resolve({ latitude: loc.lat(), longitude: loc.lng(), placeId: results[0].place_id });
@@ -505,10 +514,10 @@ export default function MapScreen() {
       setMapKey((k) => k + 1);
       return;
     }
-    // 位置：用完整流程（URL座標 → 短網址 → 地址文字 → 名稱）
+    // 位置：用完整流程（短網址 → URL座標 → 地址文字 → 名稱）
     const c = await resolveItemCoords(item, placesRef.current);
-    // 資訊卡：永遠用 title 搜，確保拿到完整店家資訊（地址搜尋只會拿到街道地址卡片）
-    const titleHit = await googleTextSearch(placesRef.current, item.title);
+    // 資訊卡：用 title + 座標偏好搜尋，避免全球同名地點污染結果
+    const titleHit = await googleTextSearch(placesRef.current, item.title, c ?? undefined);
     if (titleHit?.placeId) { showPlaceDetails(titleHit.placeId); return; }
     // title 找不到 → 退回 resolveItemCoords 的結果
     if (c?.placeId) { showPlaceDetails(c.placeId); return; }
