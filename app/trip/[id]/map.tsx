@@ -27,14 +27,18 @@ const PLACE_TYPE_ZH: Record<string, string> = {
 };
 const placeTypeLabel = (t?: string) => (t ? PLACE_TYPE_ZH[t] || t.replace(/_/g, ' ') : '');
 
-// 由 item 建立搜尋詞：優先用 title（店名），地址文字只作為備用
+// 從 location 擷取純地址文字（去掉 URL 和前綴標記）
+function extractAddrText(location: string): string {
+  let t = location.trim();
+  t = t.replace(/^\[[^\]]*\]\s*/, '');
+  t = t.replace(/https?:\/\/\S+/g, '').trim();
+  t = t.replace(/[，,]\s*$/, '').trim();
+  return t;
+}
+
+// 供無 Google API 退路使用
 function buildSearchQuery(item: { location?: string; title: string }): string {
-  if (item.title.trim()) return item.title.trim();
-  let loc = (item.location || '').trim();
-  loc = loc.replace(/^\[[^\]]*\]\s*/, '');
-  loc = loc.replace(/https?:\/\/\S+/g, '').trim();
-  loc = loc.replace(/[，,]\s*$/, '').trim();
-  return loc;
+  return extractAddrText(item.location || '') || item.title.trim();
 }
 
 // 載入 Google Maps JS API（只載一次）
@@ -74,12 +78,36 @@ function googleTextSearch(service: any, query: string): Promise<GeoHit | null> {
 }
 
 async function resolveItemCoords(item: ItineraryItem, service: any): Promise<GeoHit | null> {
-  const fromUrl = extractCoordsFromUrl(item.location_url || '') || extractCoordsFromUrl(item.location || '');
+  const locUrl = item.location_url || '';
+  const loc = item.location || '';
+
+  // 1. 直接從 URL 提取座標（長網址含 @lat,lng 等格式）
+  const fromUrl = extractCoordsFromUrl(locUrl) || extractCoordsFromUrl(loc);
   if (fromUrl) return fromUrl;
-  for (const q of [buildSearchQuery(item), item.title].filter(Boolean)) {
-    const hit = await googleTextSearch(service, q);
+
+  // 2. 短網址 → 追蹤 HTTP 轉址，從最終 URL 取座標
+  const rawUrl = (locUrl || loc).match(/https?:\/\/\S+/)?.[0];
+  if (rawUrl) {
+    try {
+      const resp = await fetch(rawUrl, { redirect: 'follow' });
+      const coords = extractCoordsFromUrl(resp.url);
+      if (coords) return coords;
+    } catch {}
+  }
+
+  // 3. location 地址文字（去掉 URL 後剩餘的純文字）
+  const addrText = extractAddrText(loc);
+  if (addrText) {
+    const hit = await googleTextSearch(service, addrText);
     if (hit) return hit;
   }
+
+  // 4. 行程名稱（最後備用）
+  if (item.title.trim()) {
+    const hit = await googleTextSearch(service, item.title.trim());
+    if (hit) return hit;
+  }
+
   return null;
 }
 
@@ -452,7 +480,7 @@ export default function MapScreen() {
     mapRef.current.setZoom(16);
   };
 
-  // 點行程地點 → 放標記 + 跳資訊卡（跟搜尋一樣）
+  // 點行程地點 → 放標記 + 跳資訊卡
   const showOnMap = async (item: ItineraryItem) => {
     setShowPanel(false);
     setSearch(item.title);
@@ -462,15 +490,14 @@ export default function MapScreen() {
       setMapKey((k) => k + 1);
       return;
     }
+    // 位置：用完整流程（URL座標 → 短網址 → 地址文字 → 名稱）
     const c = await resolveItemCoords(item, placesRef.current);
+    // 資訊卡：永遠用 title 搜，確保拿到完整店家資訊（地址搜尋只會拿到街道地址卡片）
+    const titleHit = await googleTextSearch(placesRef.current, item.title);
+    if (titleHit?.placeId) { showPlaceDetails(titleHit.placeId); return; }
+    // title 找不到 → 退回 resolveItemCoords 的結果
     if (c?.placeId) { showPlaceDetails(c.placeId); return; }
-    // 從 URL 拿到座標但沒有 placeId → 仍用地名搜尋以拿到資訊卡
-    if (c) {
-      const hit = await googleTextSearch(placesRef.current, item.title);
-      if (hit?.placeId) { showPlaceDetails(hit.placeId); return; }
-      markAt(c.latitude, c.longitude, item.title);
-      return;
-    }
+    if (c) { markAt(c.latitude, c.longitude, item.title); return; }
     setQuery(buildSearchQuery(item)); setMapKey((k) => k + 1);
   };
 
