@@ -203,7 +203,7 @@ export default function MapScreen() {
     const dayOrder: Record<string, number> = {};
     days.forEach((d, i) => { dayOrder[d.id] = i; });
     return items
-      .filter((item) => item.location?.trim())
+      .filter((item) => item.location?.trim() || item.place_id?.trim() || item.address?.trim() || item.location_url?.trim())
       .sort((a, b) => {
         const dd = (dayOrder[a.day_id] ?? 999) - (dayOrder[b.day_id] ?? 999);
         if (dd !== 0) return dd;
@@ -806,6 +806,17 @@ export default function MapScreen() {
             {/* 標題列常駐 */}
             <View style={styles.placeHeaderBar}>
               <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
+              <TouchableOpacity
+                style={styles.openGmapBtn}
+                onPress={() => {
+                  const url = place.placeId
+                    ? `https://www.google.com/maps/place/?q=place_id:${place.placeId}`
+                    : `https://www.google.com/maps?q=${place.lat},${place.lng}`;
+                  window.open(url, 'travelExt');
+                }}
+              >
+                <Text style={styles.openGmapText}>🗺️</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                 <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
               </TouchableOpacity>
@@ -950,6 +961,8 @@ const styles = StyleSheet.create({
   placeCardBody: { paddingHorizontal: 14, paddingBottom: 14 },
   placeCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   favHeart: { padding: 4 },
+  openGmapBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  openGmapText: { fontSize: 18 },
   favEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 30, lineHeight: 22 },
   favRemove: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
   favAddHeader: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: Colors.primary + '20', borderRadius: 8, marginLeft: 8 },

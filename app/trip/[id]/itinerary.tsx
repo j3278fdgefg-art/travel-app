@@ -719,22 +719,6 @@ export default function ItineraryScreen() {
             <Text style={styles.label}>名稱 *</Text>
             <TextInput style={styles.input} value={form.title} onChangeText={(v) => setField('title', v)} placeholder="VIA INN 岡山 入住" placeholderTextColor={Colors.textLight} />
 
-            <Text style={styles.label}>地點（可貼上 Google 地圖網址）</Text>
-            <TextInput
-              style={styles.input}
-              value={locationInput}
-              onChangeText={handleLocationInput}
-              placeholder="地點名稱 或 https://maps.google.com/..."
-              placeholderTextColor={Colors.textLight}
-              multiline={false}
-            />
-            {urlDetected && (
-              <View style={styles.urlDetectedBox}>
-                <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                <Text style={styles.urlDetectedText}>已辨識 Google 地圖連結：{form.location}</Text>
-              </View>
-            )}
-
             <Text style={styles.label}>地址（用於地圖查找）</Text>
             <TextInput
               style={styles.input}
