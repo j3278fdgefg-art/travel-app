@@ -49,7 +49,7 @@ export interface ItineraryItem {
 export interface Booking {
   id: string;
   trip_id: string;
-  type: 'flight' | 'hotel' | 'car' | 'voucher';
+  type: 'flight' | 'hotel' | 'car' | 'rental' | 'voucher';
   title: string;
   booking_ref: string;
   provider: string;
@@ -124,7 +124,8 @@ export const EXPENSE_CATEGORIES = {
 export const BOOKING_TYPES = {
   flight: '機票',
   hotel: '住宿',
-  car: '租車',
+  car: '交通',
+  rental: '租車',
   voucher: '憑證',
 } as const;
 

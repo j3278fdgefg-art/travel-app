@@ -15,14 +15,16 @@ import { Booking, BOOKING_TYPES } from '../../../types';
 const TABS: Array<{ key: Booking['type']; label: string; emoji: string }> = [
   { key: 'flight', label: '機票', emoji: '✈️' },
   { key: 'hotel', label: '住宿', emoji: '🏨' },
-  { key: 'car', label: '租車', emoji: '🚗' },
+  { key: 'car', label: '交通', emoji: '🚌' },
+  { key: 'rental', label: '租車', emoji: '🚗' },
   { key: 'voucher', label: '憑證', emoji: '🎫' },
 ];
 
 const EMPTY_DESC: Record<Booking['type'], string> = {
   flight: '把航班、訂位代號、座位資訊存進來',
   hotel: '把住宿名稱、入住/退房日期存進來',
-  car: '把租車公司、取還車地點存進來',
+  car: '把巴士、火車、渡輪等交通票券存進來',
+  rental: '把租車公司、取還車地點存進來',
   voucher: '把景點門票、體驗券、交通票券的兌換碼存進來',
 };
 
@@ -181,8 +183,8 @@ export default function BookingsScreen() {
       seat_number: '',
       check_in: b.check_in || '',
       check_out: b.check_out || '',
-      pickup: b.type === 'car' ? (b.from_location || '') : '',
-      dropoff: b.type === 'car' ? (b.to_location || '') : '',
+      pickup: (b.type === 'car' || b.type === 'rental') ? (b.from_location || '') : '',
+      dropoff: (b.type === 'car' || b.type === 'rental') ? (b.to_location || '') : '',
       title: b.title || '',
       booking_ref: b.booking_ref || '',
       amount: b.amount ? String(b.amount) : '',
@@ -221,6 +223,12 @@ export default function BookingsScreen() {
     } else if (activeTab === 'hotel') {
       payload = { ...payload, title: form.title, check_in: form.check_in, check_out: form.check_out };
     } else if (activeTab === 'car') {
+      payload = {
+        ...payload, title: form.title,
+        departure_time: form.dep_hour ? `${form.dep_hour.padStart(2, '0')}:${form.dep_min.padStart(2, '0')}` : '',
+        from_location: form.pickup, to_location: form.dropoff,
+      };
+    } else if (activeTab === 'rental') {
       payload = { ...payload, title: form.title, from_location: form.pickup, to_location: form.dropoff };
     } else {
       payload = { ...payload, title: form.title };
@@ -490,6 +498,74 @@ export default function BookingsScreen() {
 
     if (activeTab === 'car') return (
       <>
+        <Text style={styles.label}>名稱 *</Text>
+        <TextInput
+          style={styles.input} value={form.title}
+          onChangeText={(v) => setField('title', v)}
+          placeholder="台鐵自強號 / 高速巴士" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => bookingRefRef.current?.focus()}
+        />
+
+        <Text style={styles.label}>訂位代號</Text>
+        <TextInput
+          ref={bookingRefRef}
+          style={styles.input} value={form.booking_ref}
+          onChangeText={(v) => setField('booking_ref', v)}
+          placeholder="ABC123" placeholderTextColor={Colors.textLight}
+          returnKeyType="next"
+        />
+
+        <Text style={styles.label}>搭車時間</Text>
+        <TimeInput
+          hourVal={form.dep_hour} minVal={form.dep_min}
+          onHourChange={(v) => setField('dep_hour', v)}
+          onMinChange={(v) => setField('dep_min', v)}
+          minRef={depMinRef} nextRef={fromCityRef}
+        />
+
+        <View style={styles.timePairRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.label}>出發地</Text>
+            <TextInput
+              ref={fromCityRef}
+              style={styles.input} value={form.pickup}
+              onChangeText={(v) => setField('pickup', v)}
+              placeholder="台北車站" placeholderTextColor={Colors.textLight}
+              returnKeyType="next" onSubmitEditing={() => toCityRef.current?.focus()}
+            />
+          </View>
+          <View style={{ width: 10 }} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.label}>目的地</Text>
+            <TextInput
+              ref={toCityRef}
+              style={styles.input} value={form.dropoff}
+              onChangeText={(v) => setField('dropoff', v)}
+              placeholder="高雄左營" placeholderTextColor={Colors.textLight}
+              returnKeyType="next" onSubmitEditing={() => noteRef.current?.focus()}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.label}>乘客</Text>
+        <View style={styles.memberGrid}>
+          {members.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.memberChip, selectedMembers.has(m.display_name) && styles.memberChipSelected]}
+              onPress={() => toggleMember(m.display_name)}
+            >
+              <Text style={{ fontSize: 14 }}>{m.avatar_emoji}</Text>
+              <Text style={[styles.chipText, selectedMembers.has(m.display_name) && { color: '#fff' }]}>{m.display_name}</Text>
+              {selectedMembers.has(m.display_name) && <Ionicons name="checkmark-circle" size={14} color="#fff" />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </>
+    );
+
+    if (activeTab === 'rental') return (
+      <>
         <Text style={styles.label}>租車公司 / 車型 *</Text>
         <TextInput
           style={styles.input} value={form.title}
@@ -522,6 +598,7 @@ export default function BookingsScreen() {
           style={styles.input} value={form.dropoff}
           onChangeText={(v) => setField('dropoff', v)}
           placeholder="廣島市區" placeholderTextColor={Colors.textLight}
+          returnKeyType="next" onSubmitEditing={() => noteRef.current?.focus()}
         />
 
         <Text style={styles.label}>乘客</Text>
@@ -671,8 +748,8 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 12, backgroundColor: Colors.background },
   tabActive: { backgroundColor: Colors.primary },
-  tabEmoji: { fontSize: 20 },
-  tabLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  tabEmoji: { fontSize: 17 },
+  tabLabel: { fontSize: 9, color: Colors.textSecondary, marginTop: 2 },
   tabLabelActive: { color: '#fff', fontWeight: '600' },
   list: { padding: 16, paddingBottom: 100 },
   card: { backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 14, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
