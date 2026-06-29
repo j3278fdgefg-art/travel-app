@@ -64,7 +64,7 @@ export default function FavoritesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.text} />
+          <Ionicons name="chevron-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>收藏管理</Text>
@@ -154,7 +154,11 @@ export default function FavoritesScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.favName} numberOfLines={1}>{f.name}</Text>
                   {!!f.address && <Text style={styles.favAddr} numberOfLines={1}>{f.address}</Text>}
-                  {!!f.category && <Text style={styles.favCatTag} numberOfLines={1}>#{f.category}</Text>}
+                  {!!f.category && (
+                    <View style={styles.favCatTag}>
+                      <Text style={styles.favCatTagText} numberOfLines={1}>#{f.category}</Text>
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={styles.moveBtn}
@@ -223,16 +227,16 @@ export default function FavoritesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.card },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, backgroundColor: '#5A7A4A' },
   backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  headerSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
   body: { flex: 1, flexDirection: 'row' },
-  leftPanel: { width: 104, borderRightWidth: 1, borderRightColor: Colors.border, backgroundColor: Colors.card },
+  leftPanel: { width: 84, borderRightWidth: 1, borderRightColor: Colors.border, backgroundColor: '#EEE9DD' },
   rightPanel: { flex: 1, backgroundColor: Colors.background },
   catBtn: { paddingHorizontal: 4, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border, alignItems: 'center' },
   catBtnActive: { backgroundColor: Colors.primary },
-  catBtnText: { fontSize: 12, fontWeight: '600', color: Colors.text, lineHeight: 17, textAlign: 'center' },
+  catBtnText: { fontSize: 11, fontWeight: '600', color: Colors.text, lineHeight: 16, textAlign: 'center' },
   catBtnTextActive: { color: '#fff' },
   catBtnCount: { fontSize: 10, color: Colors.textSecondary, fontWeight: '400' },
   editIcon: { width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
@@ -243,13 +247,14 @@ const styles = StyleSheet.create({
   renameOkText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   renameCancel: { fontSize: 15, color: Colors.textSecondary, fontWeight: '700', paddingHorizontal: 4 },
   favRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.card, borderRadius: 12, padding: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  favHeart: { fontSize: 15 },
-  favName: { fontSize: 13, fontWeight: '600', color: Colors.text },
-  favAddr: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
-  favCatTag: { fontSize: 11, color: Colors.primary, marginTop: 2 },
+  favHeart: { fontSize: 16 },
+  favName: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  favAddr: { fontSize: 12, color: '#888', marginTop: 1 },
+  favCatTag: { alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: 'rgba(124,154,107,0.12)' },
+  favCatTagText: { fontSize: 10, color: '#5A7A4A', fontWeight: '600' },
   moveBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   moveBtnText: { fontSize: 11, color: Colors.textSecondary },
-  deleteBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
+  deleteBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center' },
   deleteBtnEmoji: { fontSize: 13 },
   emptyRight: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 40 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
