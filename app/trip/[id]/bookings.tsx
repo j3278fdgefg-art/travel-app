@@ -679,11 +679,13 @@ export default function BookingsScreen() {
             </View>
           </TouchableOpacity>
         ) : filtered.map(renderBooking)}
-      </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={openModal}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+        {filtered.length > 0 && (
+          <TouchableOpacity style={styles.addDashBox} onPress={openModal} activeOpacity={0.7}>
+            <Ionicons name="add" size={24} color={Colors.textLight} />
+          </TouchableOpacity>
+        )}
+      </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -782,7 +784,7 @@ const styles = StyleSheet.create({
   emptyDesc: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   emptyAddBtn: { marginTop: 18, backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 14 },
   emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1, padding: 24 },

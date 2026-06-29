@@ -512,13 +512,13 @@ export default function ItineraryScreen() {
         })}
       </ScrollView>
 
-      <ScrollView style={styles.timeline} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView style={styles.timeline} contentContainerStyle={{ paddingBottom: 40 }}>
 
         {currentDayItems.length === 0 ? (
           <View style={styles.emptyDay}>
             <Text style={styles.emptyEmoji}>📅</Text>
             <Text style={styles.emptyText}>今天還沒有行程</Text>
-            <Text style={styles.emptySubtext}>點擊右下角 + 新增</Text>
+            <Text style={styles.emptySubtext}>點擊下方 ＋ 新增</Text>
           </View>
         ) : (
           currentDayItems.map((item, idx) => {
@@ -609,11 +609,11 @@ export default function ItineraryScreen() {
             );
           })
         )}
-      </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={openAdd}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
+          <Ionicons name="add" size={24} color={Colors.textLight} />
+        </TouchableOpacity>
+      </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { paddingBottom: kbOffset }]}>
@@ -880,7 +880,7 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },
   emptySubtext: { fontSize: 13, color: Colors.textSecondary, marginTop: 6 },
-  fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
+  addDashBox: { marginHorizontal: 0, marginTop: 12, marginBottom: 8, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1, padding: 24 },

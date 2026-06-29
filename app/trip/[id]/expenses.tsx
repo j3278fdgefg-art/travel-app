@@ -446,14 +446,14 @@ export default function ExpensesScreen() {
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>💰</Text>
             <Text style={styles.emptyText}>還沒有消費記錄</Text>
-            <Text style={styles.emptySubtext}>點擊右下角 ＋ 記下第一筆花費</Text>
+            <Text style={styles.emptySubtext}>點擊下方 ＋ 記下第一筆花費</Text>
           </View>
         )}
-      </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={openAdd}>
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
+          <Ionicons name="add" size={24} color={Colors.textLight} />
+        </TouchableOpacity>
+      </ScrollView>
 
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
   emptySubtext: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   ownerNote: { textAlign: 'center', fontSize: 12, color: Colors.textSecondary, paddingVertical: 8 },
-  fab: { position: 'absolute', bottom: 80, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
   modalContent: { padding: 24, paddingBottom: 60 },
