@@ -239,10 +239,15 @@ export default function ExpensesScreen() {
     }
   };
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handleDelete = (e: Expense) => {
-    if (window.confirm(`確定刪除「${e.title}」？`)) {
+    if (confirmDeleteId === e.id) {
       deleteExpense(e.id);
       logActivity(id, members.find((m) => m.role === 'owner')?.display_name || '主辦人', '刪除消費', e.title);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(e.id);
     }
   };
 
@@ -429,9 +434,14 @@ export default function ExpensesScreen() {
                             <Text style={styles.btnEmoji}>✏️</Text>
                             <Text style={styles.editBtnText}>編輯</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(e)}>
+                          <TouchableOpacity
+                            style={[styles.deleteBtn, confirmDeleteId === e.id && styles.deleteBtnConfirm]}
+                            onPress={() => handleDelete(e)}
+                          >
                             <Text style={styles.btnEmoji}>🗑️</Text>
-                            <Text style={styles.deleteBtnText}>刪除</Text>
+                            <Text style={[styles.deleteBtnText, confirmDeleteId === e.id && { color: '#fff' }]}>
+                              {confirmDeleteId === e.id ? '確認刪除' : '刪除'}
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -641,13 +651,14 @@ const styles = StyleSheet.create({
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primaryLight },
   editBtnText: { color: Colors.primary, fontSize: 13 },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FEE2E2' },
+  deleteBtnConfirm: { backgroundColor: Colors.danger },
   deleteBtnText: { color: Colors.danger, fontSize: 13 },
   empty: { alignItems: 'center', marginTop: 60 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
   emptySubtext: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   ownerNote: { textAlign: 'center', fontSize: 12, color: Colors.textSecondary, paddingVertical: 8 },
-  emptyCta: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  emptyCta: { alignItems: 'center', marginTop: 40, paddingVertical: 36, paddingHorizontal: 24, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', backgroundColor: 'rgba(255,255,255,0.5)' },
   emptyAddBtn: { marginTop: 18, backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 14 },
   emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   addDashBox: { marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
