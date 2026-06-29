@@ -168,7 +168,7 @@ export default function MapScreen() {
   const [place, setPlace] = useState<any | null>(null);
   const [placeCollapsed, setPlaceCollapsed] = useState(false);
   const [route, setRoute] = useState<any | null>(null);
-  const [routeCollapsed, setRouteCollapsed] = useState(false);
+  const [routePanelVisible, setRoutePanelVisible] = useState(true);
   const [routing, setRouting] = useState(false);
   const dirServiceRef = useRef<any>(null);
   const dirRendererRef = useRef<any>(null);
@@ -522,7 +522,6 @@ export default function MapScreen() {
             dirRendererRef.current.setMap(mapRef.current);
             dirRendererRef.current.setDirections(result);
             const leg = result.routes[0].legs[0];
-            setRouteCollapsed(false);
             setRoute({
               mode, dest,
               distance: leg.distance?.text, duration: leg.duration?.text,
@@ -531,6 +530,7 @@ export default function MapScreen() {
                 dist: s.distance?.text,
               })),
             });
+            setRoutePanelVisible(true);
             setPlace(null);
           } else {
             alert('找不到這個交通方式的路線，換一種試試');
@@ -551,6 +551,7 @@ export default function MapScreen() {
 
   const clearRoute = () => {
     setRoute(null);
+    setRoutePanelVisible(true);
     try { dirRendererRef.current?.setDirections({ routes: [] }); } catch {}
   };
 
@@ -789,6 +790,11 @@ export default function MapScreen() {
               <Text style={styles.ctrlBtnEmoji}>ℹ️</Text>
             </TouchableOpacity>
           )}
+          {route && !routePanelVisible && (
+            <TouchableOpacity style={styles.ctrlBtn} onPress={() => setRoutePanelVisible(true)}>
+              <Text style={styles.ctrlBtnEmoji}>🗺️</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[styles.ctrlBtn, showFav && styles.ctrlBtnActive]} onPress={() => { setShowFav((v) => !v); setShowPanel(false); }}>
             <Text style={styles.ctrlBtnEmoji}>{showFav ? '❤️' : '🤍'}</Text>
           </TouchableOpacity>
@@ -900,7 +906,7 @@ export default function MapScreen() {
             {/* 標題行：名稱 ↗導航 🗺️Google Maps ❤️收藏 ✕關閉 */}
             <View style={styles.placeHeaderBar}>
               <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={1}>{place.name}</Text>
-              <TouchableOpacity style={styles.infoActionBtn} onPress={() => navigateToPlace(place)}>
+              <TouchableOpacity style={styles.infoActionBtn} onPress={() => place.lat !== undefined && computeRoute({ lat: place.lat, lng: place.lng, name: place.name }, 'DRIVING')} disabled={routing}>
                 <Text style={[styles.ctrlBtnEmoji, { color: Colors.primary, fontWeight: '700', fontSize: 16 }]}>↗</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1008,39 +1014,35 @@ export default function MapScreen() {
           </Animated.View>
         )}
 
-        {/* App 內路線面板（可收合，不擋地圖） */}
-        {route && (
+        {/* App 內路線面板（▾ 收合整張卡，不擋地圖） */}
+        {route && routePanelVisible && (
           <View style={[styles.sheet, { right: sheetRight }]}>
             <View style={styles.routeHeader}>
               <Text style={styles.routeSummary}>{route.duration} · {route.distance}</Text>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity onPress={() => setRouteCollapsed((v) => !v)} style={styles.drawerClose}>
-                <Text style={styles.drawerCloseText}>{routeCollapsed ? '▴' : '▾'}</Text>
+              <TouchableOpacity onPress={() => setRoutePanelVisible(false)} style={styles.drawerClose}>
+                <Text style={styles.drawerCloseText}>▾</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={clearRoute} style={[styles.drawerClose, { marginLeft: 6 }]}>
                 <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            {!routeCollapsed && (
-              <>
-                <View style={styles.modeTabs}>
-                  {(['WALKING', 'DRIVING', 'TRANSIT'] as const).map((m) => (
-                    <TouchableOpacity key={m} style={[styles.modeTab, route.mode === m && styles.modeTabActive]} onPress={() => computeRoute(route.dest, m)}>
-                      <Text style={[styles.modeTabText, route.mode === m && styles.modeTabTextActive]}>{m === 'WALKING' ? '🚶 走路' : m === 'DRIVING' ? '🚗 開車' : '🚌 大眾運輸'}</Text>
-                    </TouchableOpacity>
-                  ))}
+            <View style={styles.modeTabs}>
+              {(['WALKING', 'DRIVING', 'TRANSIT'] as const).map((m) => (
+                <TouchableOpacity key={m} style={[styles.modeTab, route.mode === m && styles.modeTabActive]} onPress={() => computeRoute(route.dest, m)}>
+                  <Text style={[styles.modeTabText, route.mode === m && styles.modeTabTextActive]}>{m === 'WALKING' ? '🚶 走路' : m === 'DRIVING' ? '🚗 開車' : '🚌 大眾運輸'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+              {route.steps.map((s: any, i: number) => (
+                <View key={i} style={styles.stepRow}>
+                  <Text style={styles.stepNum}>{i + 1}</Text>
+                  <Text style={styles.stepInstr}>{s.instr}</Text>
+                  {!!s.dist && <Text style={styles.stepDist}>{s.dist}</Text>}
                 </View>
-                <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
-                  {route.steps.map((s: any, i: number) => (
-                    <View key={i} style={styles.stepRow}>
-                      <Text style={styles.stepNum}>{i + 1}</Text>
-                      <Text style={styles.stepInstr}>{s.instr}</Text>
-                      {!!s.dist && <Text style={styles.stepDist}>{s.dist}</Text>}
-                    </View>
-                  ))}
-                </ScrollView>
-              </>
-            )}
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
