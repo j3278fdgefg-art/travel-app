@@ -610,9 +610,13 @@ export default function ItineraryScreen() {
           })
         )}
 
-        <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
-          <Ionicons name="add" size={24} color={Colors.textLight} />
-        </TouchableOpacity>
+        <View style={styles.timelineRow}>
+          <View style={styles.timeCol} />
+          <View style={{ width: 24, marginRight: 12 }} />
+          <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
+            <Ionicons name="add" size={24} color={Colors.textLight} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -880,7 +884,7 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },
   emptySubtext: { fontSize: 13, color: Colors.textSecondary, marginTop: 6 },
-  addDashBox: { marginHorizontal: 0, marginTop: 12, marginBottom: 8, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  addDashBox: { flex: 1, marginTop: 4, marginBottom: 8, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1, padding: 24 },
