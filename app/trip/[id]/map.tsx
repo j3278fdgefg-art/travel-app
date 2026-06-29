@@ -184,11 +184,10 @@ export default function MapScreen() {
   const [favPickerVisible, setFavPickerVisible] = useState(false);
   const [favPickerInput, setFavPickerInput] = useState('');
   const [pendingFavPlace, setPendingFavPlace] = useState<any | null>(null);
-  const DRAWER_W = 190;
-  const DRAWER_RIGHT = 60;
-  const DRAWER_CLOSE_X = DRAWER_W + DRAWER_RIGHT;
-  const drawerX = useRef(new Animated.Value(DRAWER_CLOSE_X)).current;
-  const favX = useRef(new Animated.Value(DRAWER_CLOSE_X)).current;
+  const DRAWER_W = 220;
+  const DRAWER_H = Math.round(winHeight * 0.55);
+  const drawerY = useRef(new Animated.Value(DRAWER_H)).current;
+  const favY = useRef(new Animated.Value(DRAWER_H)).current;
   const sheetTop = useRef(new Animated.Value(Math.round(winHeight * 0.5))).current;
   const sheetExpandedRef = useRef(false);
   const winHeightRef = useRef(winHeight);
@@ -205,11 +204,11 @@ export default function MapScreen() {
     },
   })).current;
   useEffect(() => {
-    Animated.timing(drawerX, { toValue: showPanel ? 0 : DRAWER_CLOSE_X, duration: 250, useNativeDriver: false }).start();
-  }, [showPanel]);
+    Animated.timing(drawerY, { toValue: showPanel ? 0 : DRAWER_H, duration: 250, useNativeDriver: false }).start();
+  }, [showPanel, DRAWER_H]);
   useEffect(() => {
-    Animated.timing(favX, { toValue: showFav ? 0 : DRAWER_CLOSE_X, duration: 250, useNativeDriver: false }).start();
-  }, [showFav]);
+    Animated.timing(favY, { toValue: showFav ? 0 : DRAWER_H, duration: 250, useNativeDriver: false }).start();
+  }, [showFav, DRAWER_H]);
   useEffect(() => { winHeightRef.current = winHeight; }, [winHeight]);
   const [gLoaded, setGLoaded] = useState(false);
   const [gError, setGError] = useState(false);
@@ -396,13 +395,13 @@ export default function MapScreen() {
         title: f.name,
         icon: {
           path: g.maps.SymbolPath.CIRCLE,
-          scale: 18,
+          scale: 9,
           fillColor: '#FF4D6D',
           fillOpacity: 1,
           strokeColor: '#fff',
-          strokeWeight: 2,
+          strokeWeight: 1.5,
         },
-        label: { text: '♥', color: '#fff', fontSize: '18px', fontWeight: '700' },
+        label: { text: '♥', color: '#fff', fontSize: '12px', fontWeight: '700' },
       });
       marker.addListener('click', () => {
         if (f.place_id && placesRef.current) showPlaceDetails(f.place_id);
@@ -794,7 +793,7 @@ export default function MapScreen() {
             <Text style={styles.ctrlBtnEmoji}>{showFav ? '❤️' : '🤍'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.ctrlBtn, !showFavMarkers && styles.ctrlBtnDim]} onPress={() => setShowFavMarkers((v) => !v)}>
-            <Text style={[styles.ctrlBtnEmoji, { color: '#FF4D6D' }]}>♥</Text>
+            <Text style={[styles.ctrlBtnEmoji, { color: '#FF4D6D', fontSize: 26 }]}>♥</Text>
           </TouchableOpacity>
           {locationItems.length > 0 && (
             <TouchableOpacity style={[styles.ctrlBtn, showPanel && styles.ctrlBtnActive]} onPress={() => { setShowPanel((v) => !v); setShowFav(false); }}>
@@ -812,7 +811,7 @@ export default function MapScreen() {
         </View>
 
         {/* 右側滑出的行程地點抽屜 */}
-        <Animated.View style={[styles.drawer, { width: DRAWER_W, right: DRAWER_RIGHT, transform: [{ translateX: drawerX }] }]}>
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, height: DRAWER_H, transform: [{ translateY: drawerY }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>📍 行程地點</Text>
             <View style={{ flex: 1 }} />
@@ -850,7 +849,7 @@ export default function MapScreen() {
         </Animated.View>
 
         {/* 右側滑出的收藏清單抽屜 */}
-        <Animated.View style={[styles.drawer, { width: DRAWER_W, right: DRAWER_RIGHT, transform: [{ translateX: favX }] }]}>
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, height: DRAWER_H, transform: [{ translateY: favY }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>❤️ 收藏清單</Text>
             <View style={{ flex: 1 }} />
@@ -893,7 +892,7 @@ export default function MapScreen() {
 
         {/* 店家完整資訊卡（收合時整張隱藏，靠右側 ℹ️ 展開；點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && !placeCollapsed && (
-          <Animated.View style={[styles.sheet, { right: sheetRight, top: sheetTop }]}>
+          <Animated.View style={[styles.sheet, { width: Math.min(320, winWidth - 76), top: sheetTop }]}>
             {/* 拖曳把手：向上滑展開，向下滑收合，點擊切換 */}
             <View {...dragPanResponder.panHandlers} style={styles.dragHandle}>
               <View style={styles.dragBar} />
@@ -1070,7 +1069,7 @@ const styles = StyleSheet.create({
   ctrlBtnDim: { opacity: 0.55 },
   ctrlBtnEmoji: { fontSize: 18 },
   // 右側滑出抽屜
-  drawer: { position: 'absolute', top: 0, bottom: 0, right: 0, backgroundColor: Colors.background, paddingHorizontal: 12, paddingTop: 12, zIndex: 6, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: -4, height: 0 }, elevation: 8 },
+  drawer: { position: 'absolute', bottom: 0, left: 0, backgroundColor: Colors.background, paddingHorizontal: 12, paddingTop: 12, zIndex: 6, borderTopLeftRadius: 16, borderTopRightRadius: 16, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 8 },
   drawerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 4 },
   drawerClose: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.card, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
   drawerCloseText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '700' },
