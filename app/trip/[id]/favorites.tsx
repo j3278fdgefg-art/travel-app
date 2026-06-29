@@ -80,8 +80,9 @@ export default function FavoritesScreen() {
         </View>
       ) : (
         <View style={styles.body}>
-          {/* 左側：分類清單 (1/4) */}
-          <ScrollView style={styles.leftPanel} contentContainerStyle={{ paddingVertical: 8 }}>
+          {/* 左側：分類清單 */}
+          <View style={styles.leftPanel}>
+          <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
             <TouchableOpacity
               style={[styles.catBtn, selectedCat === 'all' && styles.catBtnActive]}
               onPress={() => setSelectedCat('all')}
@@ -141,8 +142,9 @@ export default function FavoritesScreen() {
               );
             })}
           </ScrollView>
+          </View>
 
-          {/* 右側：地點清單 (3/4) */}
+          {/* 右側：地點清單 */}
           <ScrollView style={styles.rightPanel} contentContainerStyle={{ padding: 10, paddingBottom: 40, gap: 8 }}>
             {displayFavs.length === 0 ? (
               <Text style={styles.emptyRight}>此分類沒有收藏</Text>
