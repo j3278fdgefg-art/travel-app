@@ -246,6 +246,7 @@ export default function ItineraryScreen() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [addTab, setAddTab] = useState<'manual' | 'favorite'>('manual');
+  const [favCatFilter, setFavCatFilter] = useState<string>('all');
   const [transitItem, setTransitItem] = useState<ItineraryItem | null>(null);
   const [transitMode, setTransitMode] = useState('🚶');
   const [transitMin, setTransitMin] = useState('');
@@ -634,29 +635,42 @@ export default function ItineraryScreen() {
               </TouchableOpacity>
             </View>
 
-            {addTab === 'favorite' && (
-              <View style={{ marginTop: 4 }}>
-                {favorites.filter((f) => !f.is_header).length === 0 ? (
-                  <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
-                ) : favorites.map((f) => {
-                  if (f.is_header) {
-                    return (
-                      <Text key={f.id} style={styles.favPickSection}>{f.name}</Text>
-                    );
-                  }
-                  return (
+            {addTab === 'favorite' && (() => {
+              const realFavs = favorites.filter((f) => !f.is_header);
+              const favCats = Array.from(new Set(realFavs.map((f) => f.category || '').filter((c) => c !== '')));
+              const filtered = favCatFilter === 'all' ? realFavs
+                : realFavs.filter((f) => (f.category || '') === favCatFilter);
+              return (
+                <View style={{ marginTop: 4 }}>
+                  {favCats.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.favCatRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 4, paddingVertical: 8 }}>
+                      {(['all', '', ...favCats] as string[]).map((cat, idx) => (
+                        <TouchableOpacity key={idx} style={[styles.favCatChip, favCatFilter === cat && styles.favCatChipActive]} onPress={() => setFavCatFilter(cat)}>
+                          <Text style={[styles.favCatChipText, favCatFilter === cat && styles.favCatChipTextActive]}>
+                            {cat === 'all' ? '全部' : cat === '' ? '未分類' : cat}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
+                  {realFavs.length === 0 ? (
+                    <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
+                  ) : filtered.length === 0 ? (
+                    <Text style={styles.favPickEmpty}>此分類沒有收藏。</Text>
+                  ) : filtered.map((f) => (
                     <TouchableOpacity key={f.id} style={styles.favPickRow} onPress={() => pickFavorite(f)}>
                       <Text style={styles.favPickIcon}>❤️</Text>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.favPickName} numberOfLines={1}>{f.name}</Text>
+                        {!!f.category && <Text style={[styles.favPickAddr, { color: Colors.primary }]} numberOfLines={1}>#{f.category}</Text>}
                         {!!f.address && <Text style={styles.favPickAddr} numberOfLines={1}>{f.address}</Text>}
                       </View>
                       <Text style={styles.favPickArrow}>帶入 →</Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+                  ))}
+                </View>
+              );
+            })()}
 
             {addTab === 'manual' && (<>
             <Text style={styles.label}>類型</Text>
@@ -877,6 +891,11 @@ const styles = StyleSheet.create({
   addTabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   addTabText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '600' },
   addTabTextActive: { color: '#fff' },
+  favCatRow: { maxHeight: 44, flexShrink: 0 },
+  favCatChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border, borderWidth: 1, borderColor: Colors.border },
+  favCatChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  favCatChipText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  favCatChipTextActive: { color: '#fff' },
   favPickEmpty: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 24, lineHeight: 20 },
   favPickSection: { fontSize: 12, fontWeight: '700', color: Colors.primary, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 4 },
   favPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, backgroundColor: Colors.background, marginBottom: 8 },

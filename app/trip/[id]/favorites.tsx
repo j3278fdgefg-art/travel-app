@@ -18,6 +18,7 @@ export default function FavoritesScreen() {
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
 
+  const [selectedCat, setSelectedCat] = useState<string>('all');
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [catInput, setCatInput] = useState('');
   const [movingFav, setMovingFav] = useState<Favorite | null>(null);
@@ -29,12 +30,15 @@ export default function FavoritesScreen() {
 
   const realFavs = favorites.filter((f) => !f.is_header);
   const uniqueCategories = Array.from(new Set(realFavs.map((f) => f.category || ''))).sort();
+  const namedCats = uniqueCategories.filter((c) => c !== '');
   const grouped = uniqueCategories.reduce<Record<string, Favorite[]>>((acc, cat) => {
     acc[cat] = realFavs.filter((f) => (f.category || '') === cat);
     return acc;
   }, {});
 
-  const namedCats = uniqueCategories.filter((c) => c !== '');
+  const displayFavs = selectedCat === 'all'
+    ? realFavs
+    : realFavs.filter((f) => (f.category || '') === selectedCat);
 
   const renameCategory = async (oldCat: string, newCat: string) => {
     const targets = realFavs.filter((f) => (f.category || '') === oldCat);
@@ -43,6 +47,7 @@ export default function FavoritesScreen() {
     }
     await fetchFavorites(id);
     setEditingCat(null);
+    if (selectedCat === oldCat) setSelectedCat(newCat || '');
   };
 
   const moveToCategory = async (fav: Favorite, newCat: string) => {
@@ -55,6 +60,8 @@ export default function FavoritesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
+
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={Colors.text} />
@@ -63,12 +70,6 @@ export default function FavoritesScreen() {
           <Text style={styles.headerTitle}>收藏管理</Text>
           {currentTrip?.name ? <Text style={styles.headerSub} numberOfLines={1}>{currentTrip.name}</Text> : null}
         </View>
-        <TouchableOpacity
-          style={styles.mapBtn}
-          onPress={() => router.push(`/trip/${id}/map` as any)}
-        >
-          <Text style={styles.mapBtnText}>🗺️ 地圖</Text>
-        </TouchableOpacity>
       </View>
 
       {realFavs.length === 0 ? (
@@ -78,16 +79,28 @@ export default function FavoritesScreen() {
           <Text style={styles.emptySubtext}>到地圖頁點選店家，按 🤍 即可收藏</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {(['', ...namedCats] as string[]).map((cat) => {
-            const items = grouped[cat];
-            if (!items || items.length === 0) return null;
-            const isEditing = editingCat === cat;
-            return (
-              <View key={cat || '__none__'} style={styles.section}>
-                <View style={styles.sectionHeader}>
+        <View style={styles.body}>
+          {/* 左側：分類清單 (1/4) */}
+          <ScrollView style={styles.leftPanel} contentContainerStyle={{ paddingVertical: 8 }}>
+            <TouchableOpacity
+              style={[styles.catBtn, selectedCat === 'all' && styles.catBtnActive]}
+              onPress={() => setSelectedCat('all')}
+            >
+              <Text style={[styles.catBtnText, selectedCat === 'all' && styles.catBtnTextActive]} numberOfLines={2}>
+                全部{'\n'}
+                <Text style={styles.catBtnCount}>{realFavs.length}</Text>
+              </Text>
+            </TouchableOpacity>
+            {(['', ...namedCats] as string[]).map((cat) => {
+              const count = (grouped[cat] || []).length;
+              if (count === 0 && cat !== '') return null;
+              const label = cat === '' ? '未分類' : cat;
+              const isActive = selectedCat === cat;
+              const isEditing = editingCat === cat;
+              return (
+                <View key={cat || '__none__'}>
                   {isEditing ? (
-                    <View style={styles.renameRow}>
+                    <View style={styles.renameBox}>
                       <TextInput
                         style={styles.renameInput}
                         value={catInput}
@@ -97,50 +110,63 @@ export default function FavoritesScreen() {
                         placeholderTextColor={Colors.textLight}
                         onSubmitEditing={() => renameCategory(cat, catInput.trim())}
                       />
-                      <TouchableOpacity style={styles.renameConfirm} onPress={() => renameCategory(cat, catInput.trim())}>
-                        <Text style={styles.renameConfirmText}>確認</Text>
+                      <TouchableOpacity style={styles.renameOk} onPress={() => renameCategory(cat, catInput.trim())}>
+                        <Text style={styles.renameOkText}>✓</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setEditingCat(null)} style={styles.renameCancelBtn}>
-                        <Text style={styles.renameCancelText}>取消</Text>
+                      <TouchableOpacity onPress={() => setEditingCat(null)}>
+                        <Text style={styles.renameCancel}>✕</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <>
-                      <Text style={styles.sectionTitle}>{cat === '' ? '未分類' : `# ${cat}`}</Text>
-                      <Text style={styles.sectionCount}>{items.length} 個</Text>
+                    <TouchableOpacity
+                      style={[styles.catBtn, isActive && styles.catBtnActive]}
+                      onPress={() => setSelectedCat(cat)}
+                      onLongPress={() => cat !== '' ? (setEditingCat(cat), setCatInput(cat)) : undefined}
+                    >
+                      <Text style={[styles.catBtnText, isActive && styles.catBtnTextActive]} numberOfLines={2}>
+                        {label}{'\n'}
+                        <Text style={[styles.catBtnCount, isActive && { color: '#fff' }]}>{count}</Text>
+                      </Text>
                       {cat !== '' && (
                         <TouchableOpacity
-                          style={styles.renameBtn}
+                          style={styles.editIcon}
                           onPress={() => { setEditingCat(cat); setCatInput(cat); }}
                         >
-                          <Text style={styles.renameBtnText}>重命名</Text>
+                          <Text style={[styles.editIconText, isActive && { color: '#fff' }]}>✎</Text>
                         </TouchableOpacity>
                       )}
-                    </>
+                    </TouchableOpacity>
                   )}
                 </View>
-                {items.map((f) => (
-                  <View key={f.id} style={styles.favRow}>
-                    <Text style={styles.favHeart}>❤️</Text>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.favName} numberOfLines={1}>{f.name}</Text>
-                      {!!f.address && <Text style={styles.favAddr} numberOfLines={1}>{f.address}</Text>}
-                    </View>
-                    <TouchableOpacity
-                      style={styles.moveBtn}
-                      onPress={() => { setMovingFav(f); setMoveInput(''); }}
-                    >
-                      <Text style={styles.moveBtnText}>移動</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => removeFavorite(f.id)}>
-                      <Text style={styles.deleteBtnEmoji}>🗑️</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+              );
+            })}
+          </ScrollView>
+
+          {/* 右側：地點清單 (3/4) */}
+          <ScrollView style={styles.rightPanel} contentContainerStyle={{ padding: 10, paddingBottom: 40, gap: 8 }}>
+            {displayFavs.length === 0 ? (
+              <Text style={styles.emptyRight}>此分類沒有收藏</Text>
+            ) : displayFavs.map((f) => (
+              <View key={f.id} style={styles.favRow}>
+                <Text style={styles.favHeart}>❤️</Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.favName} numberOfLines={1}>{f.name}</Text>
+                  {!!f.address && <Text style={styles.favAddr} numberOfLines={1}>{f.address}</Text>}
+                  {!!f.category && <Text style={styles.favCatTag} numberOfLines={1}>#{f.category}</Text>}
+                </View>
+                <TouchableOpacity
+                  style={styles.moveBtn}
+                  onPress={() => { setMovingFav(f); setMoveInput(''); }}
+                >
+                  <Text style={styles.moveBtnText}>移動</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => removeFavorite(f.id)}>
+                  <Text style={styles.deleteBtnEmoji}>🗑️</Text>
+                </TouchableOpacity>
               </View>
-            );
-          })}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* 移動分類 Modal */}
@@ -199,29 +225,31 @@ const styles = StyleSheet.create({
   backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
   headerSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
-  mapBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary },
-  mapBtnText: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
-  list: { padding: 16, paddingBottom: 60 },
-  section: { marginBottom: 20 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingHorizontal: 4 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.primary },
-  sectionCount: { fontSize: 12, color: Colors.textSecondary },
-  renameRow: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center' },
-  renameInput: { flex: 1, height: 34, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary, paddingHorizontal: 10, fontSize: 14, color: Colors.text, backgroundColor: Colors.card },
-  renameConfirm: { paddingHorizontal: 12, height: 34, borderRadius: 8, backgroundColor: Colors.primary, justifyContent: 'center' },
-  renameConfirmText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  renameCancelBtn: { paddingHorizontal: 8, height: 34, justifyContent: 'center' },
-  renameCancelText: { color: Colors.textSecondary, fontSize: 13 },
-  renameBtn: { marginLeft: 'auto' as any, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.primaryLight },
-  renameBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  favRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.card, borderRadius: 12, padding: 12, marginBottom: 6, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  favHeart: { fontSize: 16 },
-  favName: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  favAddr: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  moveBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  moveBtnText: { fontSize: 12, color: Colors.textSecondary },
-  deleteBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
-  deleteBtnEmoji: { fontSize: 14 },
+  body: { flex: 1, flexDirection: 'row' },
+  leftPanel: { flex: 1, borderRightWidth: 1, borderRightColor: Colors.border, backgroundColor: Colors.card },
+  rightPanel: { flex: 3, backgroundColor: Colors.background },
+  catBtn: { paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  catBtnActive: { backgroundColor: Colors.primary },
+  catBtnText: { flex: 1, fontSize: 13, fontWeight: '600', color: Colors.text, lineHeight: 18 },
+  catBtnTextActive: { color: '#fff' },
+  catBtnCount: { fontSize: 11, color: Colors.textSecondary, fontWeight: '400' },
+  editIcon: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  editIconText: { fontSize: 13, color: Colors.textSecondary },
+  renameBox: { padding: 8, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 6, flexDirection: 'row', alignItems: 'center' },
+  renameInput: { flex: 1, height: 32, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary, paddingHorizontal: 8, fontSize: 13, color: Colors.text, backgroundColor: Colors.background },
+  renameOk: { width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  renameOkText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  renameCancel: { fontSize: 15, color: Colors.textSecondary, fontWeight: '700', paddingHorizontal: 4 },
+  favRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.card, borderRadius: 12, padding: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  favHeart: { fontSize: 15 },
+  favName: { fontSize: 13, fontWeight: '600', color: Colors.text },
+  favAddr: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  favCatTag: { fontSize: 11, color: Colors.primary, marginTop: 2 },
+  moveBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  moveBtnText: { fontSize: 11, color: Colors.textSecondary },
+  deleteBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
+  deleteBtnEmoji: { fontSize: 13 },
+  emptyRight: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 40 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
   emptyEmoji: { fontSize: 52, marginBottom: 14 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },

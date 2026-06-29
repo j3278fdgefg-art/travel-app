@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated, useWindowDimensions,
+  SafeAreaView, Platform, ActivityIndicator, ScrollView, Animated, PanResponder, useWindowDimensions,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Colors } from '../../../constants/colors';
@@ -151,7 +151,7 @@ export default function MapScreen() {
   const params = useGlobalSearchParams<{ id: string; q?: string; placeId?: string }>();
   const { currentTrip, days, items, fetchTripById, fetchDays, fetchItems, favorites, fetchFavorites, addFavorite, removeFavorite } = useTripStore();
   const { googleMapsApiKey } = useSettingsStore();
-  const { width: winWidth } = useWindowDimensions();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
   // 資訊卡最寬 430px，超過後靠左貼齊 (left:12)，right 值動態收縮
   const SHEET_MAX_W = 430;
   const sheetRight = Math.max(68, winWidth - 12 - SHEET_MAX_W);
@@ -184,15 +184,33 @@ export default function MapScreen() {
   const [favPickerVisible, setFavPickerVisible] = useState(false);
   const [favPickerInput, setFavPickerInput] = useState('');
   const [pendingFavPlace, setPendingFavPlace] = useState<any | null>(null);
-  const DRAWER_W = 290;
-  const drawerX = useRef(new Animated.Value(DRAWER_W)).current;
-  const favX = useRef(new Animated.Value(DRAWER_W)).current;
+  const DRAWER_W = 190;
+  const DRAWER_RIGHT = 60;
+  const DRAWER_CLOSE_X = DRAWER_W + DRAWER_RIGHT;
+  const drawerX = useRef(new Animated.Value(DRAWER_CLOSE_X)).current;
+  const favX = useRef(new Animated.Value(DRAWER_CLOSE_X)).current;
+  const sheetTop = useRef(new Animated.Value(Math.round(winHeight * 0.5))).current;
+  const sheetExpandedRef = useRef(false);
+  const winHeightRef = useRef(winHeight);
+  const dragPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+    onPanResponderRelease: (_, gs) => {
+      const h = winHeightRef.current;
+      const expand = () => { sheetExpandedRef.current = true; Animated.spring(sheetTop, { toValue: 76, useNativeDriver: false }).start(); };
+      const collapse = () => { sheetExpandedRef.current = false; Animated.spring(sheetTop, { toValue: Math.round(h * 0.5), useNativeDriver: false }).start(); };
+      if (gs.dy < -30 || gs.vy < -0.5) expand();
+      else if (gs.dy > 20 || gs.vy > 0.3) collapse();
+      else sheetExpandedRef.current ? collapse() : expand();
+    },
+  })).current;
   useEffect(() => {
-    Animated.timing(drawerX, { toValue: showPanel ? 0 : DRAWER_W, duration: 250, useNativeDriver: false }).start();
+    Animated.timing(drawerX, { toValue: showPanel ? 0 : DRAWER_CLOSE_X, duration: 250, useNativeDriver: false }).start();
   }, [showPanel]);
   useEffect(() => {
-    Animated.timing(favX, { toValue: showFav ? 0 : DRAWER_W, duration: 250, useNativeDriver: false }).start();
+    Animated.timing(favX, { toValue: showFav ? 0 : DRAWER_CLOSE_X, duration: 250, useNativeDriver: false }).start();
   }, [showFav]);
+  useEffect(() => { winHeightRef.current = winHeight; }, [winHeight]);
   const [gLoaded, setGLoaded] = useState(false);
   const [gError, setGError] = useState(false);
 
@@ -378,13 +396,13 @@ export default function MapScreen() {
         title: f.name,
         icon: {
           path: g.maps.SymbolPath.CIRCLE,
-          scale: 14,
+          scale: 18,
           fillColor: '#FF4D6D',
           fillOpacity: 1,
           strokeColor: '#fff',
           strokeWeight: 2,
         },
-        label: { text: '♥', color: '#fff', fontSize: '13px', fontWeight: '700' },
+        label: { text: '♥', color: '#fff', fontSize: '18px', fontWeight: '700' },
       });
       marker.addListener('click', () => {
         if (f.place_id && placesRef.current) showPlaceDetails(f.place_id);
@@ -471,6 +489,8 @@ export default function MapScreen() {
         }));
         setRoute(null);
         setPlaceCollapsed(false);
+        sheetTop.setValue(Math.round(winHeight * 0.5));
+        sheetExpandedRef.current = false;
         setPlace({
           placeId, name: res.name, rating: res.rating, count: res.user_ratings_total,
           address: res.formatted_address, phone: res.formatted_phone_number,
@@ -598,6 +618,25 @@ export default function MapScreen() {
     window.addEventListener('pagehide', cancel);
     window.addEventListener('blur', cancel);
     // 1.5 秒內若 App 沒開（頁面仍可見）才退回網頁版
+    timer = setTimeout(() => { cleanup(); window.open(webUrl, 'travelExt'); }, 1500);
+    window.location.href = scheme;
+  };
+
+  const navigateToPlace = (p: any) => {
+    if (!p) return;
+    const dest = (p.lat !== undefined && p.lng !== undefined) ? `${p.lat},${p.lng}` : (p.name || '');
+    const enc = encodeURIComponent(dest);
+    const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${enc}`;
+    const ua = navigator.userAgent;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+    if (!isMobile) { window.open(webUrl, 'travelExt'); return; }
+    const scheme = /Android/i.test(ua) ? `google.navigation:q=${enc}` : `comgooglemaps://?daddr=${enc}&directionsmode=driving`;
+    let timer: any;
+    const cleanup = () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('blur', cancel); };
+    const cancel = () => { if (timer) clearTimeout(timer); cleanup(); };
+    const onVis = () => { if (document.hidden) cancel(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('blur', cancel);
     timer = setTimeout(() => { cleanup(); window.open(webUrl, 'travelExt'); }, 1500);
     window.location.href = scheme;
   };
@@ -770,13 +809,10 @@ export default function MapScreen() {
           <TouchableOpacity style={styles.ctrlBtn} onPress={handleLocate} disabled={locating}>
             {locating ? <ActivityIndicator size="small" color={Colors.primary} /> : <Text style={styles.ctrlBtnEmoji}>📍</Text>}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.ctrlBtn} onPress={navigateToQuery}>
-            <Text style={[styles.ctrlBtnEmoji, { color: Colors.primary, fontWeight: '700' }]}>↗</Text>
-          </TouchableOpacity>
         </View>
 
         {/* 右側滑出的行程地點抽屜 */}
-        <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: drawerX }] }]}>
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, right: DRAWER_RIGHT, transform: [{ translateX: drawerX }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>📍 行程地點</Text>
             <View style={{ flex: 1 }} />
@@ -814,7 +850,7 @@ export default function MapScreen() {
         </Animated.View>
 
         {/* 右側滑出的收藏清單抽屜 */}
-        <Animated.View style={[styles.drawer, { width: DRAWER_W, transform: [{ translateX: favX }] }]}>
+        <Animated.View style={[styles.drawer, { width: DRAWER_W, right: DRAWER_RIGHT, transform: [{ translateX: favX }] }]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.panelTitle}>❤️ 收藏清單</Text>
             <View style={{ flex: 1 }} />
@@ -857,15 +893,19 @@ export default function MapScreen() {
 
         {/* 店家完整資訊卡（收合時整張隱藏，靠右側 ℹ️ 展開；點地圖店家 / 標記時跳出，不離開 App） */}
         {place && !route && !placeCollapsed && (
-          <View style={[styles.sheet, { right: sheetRight }]}>
-            {/* 頂部操作列：關閉 ✕（左）＋ 開啟 Google Maps 🗺️（右） */}
-            <View style={styles.placeActionBar}>
-              <TouchableOpacity onPress={closePlace} style={styles.placeActionBtn}>
-                <Text style={styles.drawerCloseText}>✕</Text>
+          <Animated.View style={[styles.sheet, { right: sheetRight, top: sheetTop }]}>
+            {/* 拖曳把手：向上滑展開，向下滑收合，點擊切換 */}
+            <View {...dragPanResponder.panHandlers} style={styles.dragHandle}>
+              <View style={styles.dragBar} />
+            </View>
+            {/* 標題行：名稱 ↗導航 🗺️Google Maps ❤️收藏 ✕關閉 */}
+            <View style={styles.placeHeaderBar}>
+              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={1}>{place.name}</Text>
+              <TouchableOpacity style={styles.infoActionBtn} onPress={() => navigateToPlace(place)}>
+                <Text style={[styles.ctrlBtnEmoji, { color: Colors.primary, fontWeight: '700', fontSize: 16 }]}>↗</Text>
               </TouchableOpacity>
-              <View style={{ flex: 1 }} />
               <TouchableOpacity
-                style={styles.placeActionBtn}
+                style={styles.infoActionBtn}
                 onPress={() => {
                   const url = place.placeId
                     ? `https://www.google.com/maps/place/?q=place_id:${place.placeId}`
@@ -875,12 +915,11 @@ export default function MapScreen() {
               >
                 <Text style={styles.openGmapText}>🗺️</Text>
               </TouchableOpacity>
-            </View>
-            {/* 標題列常駐 */}
-            <View style={styles.placeHeaderBar}>
-              <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={2}>{place.name}</Text>
               <TouchableOpacity onPress={() => toggleFav(place)} style={styles.favHeart}>
                 <Text style={{ fontSize: 20 }}>{findFav(place) ? '❤️' : '🤍'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={closePlace} style={[styles.drawerClose, { marginLeft: 2 }]}>
+                <Text style={styles.drawerCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
             {/* 分類選擇器（點 🤍 後彈出） */}
@@ -967,7 +1006,7 @@ export default function MapScreen() {
                 )}
               </View>
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
 
         {/* App 內路線面板（可收合，不擋地圖） */}
@@ -1047,7 +1086,10 @@ const styles = StyleSheet.create({
   placeCat: { fontSize: 11, color: Colors.textSecondary },
   sheet: { position: 'absolute', top: 76, bottom: 14, left: 12, right: 68, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', zIndex: 7, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
   photoStrip: { },
-  placeHeaderBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
+  dragHandle: { alignItems: 'center', paddingTop: 8, paddingBottom: 4, cursor: 'grab' as any },
+  dragBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
+  infoActionBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', marginLeft: 2 },
+  placeHeaderBar: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
   placeCardBody: { paddingHorizontal: 14, paddingBottom: 14 },
   placeCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   favHeart: { padding: 4 },
