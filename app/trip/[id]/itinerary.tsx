@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 17, fontWeight: '600', color: Colors.text },
   emptySubtext: { fontSize: 13, color: Colors.textSecondary, marginTop: 6 },
-  addDashBox: { flex: 1, marginTop: 4, marginBottom: 8, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  addDashBox: { flex: 1, marginVertical: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalScroll: { flex: 1, padding: 24 },

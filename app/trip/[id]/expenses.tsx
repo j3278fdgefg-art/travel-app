@@ -442,17 +442,20 @@ export default function ExpensesScreen() {
             </View>
           );
         })}
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
+        {filtered.length === 0 ? (
+          <TouchableOpacity style={styles.emptyCta} onPress={openAdd} activeOpacity={0.8}>
             <Text style={styles.emptyEmoji}>💰</Text>
             <Text style={styles.emptyText}>還沒有消費記錄</Text>
-            <Text style={styles.emptySubtext}>點擊下方 ＋ 記下第一筆花費</Text>
-          </View>
+            <Text style={styles.emptySubtext}>記下第一筆花費</Text>
+            <View style={styles.emptyAddBtn}>
+              <Text style={styles.emptyAddText}>＋ 新增消費</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
+            <Ionicons name="add" size={24} color={Colors.textLight} />
+          </TouchableOpacity>
         )}
-
-        <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
-          <Ionicons name="add" size={24} color={Colors.textLight} />
-        </TouchableOpacity>
       </ScrollView>
 
       {/* 新增/編輯 Modal */}
@@ -644,7 +647,10 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
   emptySubtext: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   ownerNote: { textAlign: 'center', fontSize: 12, color: Colors.textSecondary, paddingVertical: 8 },
-  addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  emptyCta: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  emptyAddBtn: { marginTop: 18, backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 14 },
+  emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  addDashBox: { marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
   modalContent: { padding: 24, paddingBottom: 60 },
