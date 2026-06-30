@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
   addDashBox: { flex: 1, marginVertical: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { },
+  modalScroll: { flex: 1 },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   addTabs: { flexDirection: 'row', gap: 8, marginBottom: 8 },
