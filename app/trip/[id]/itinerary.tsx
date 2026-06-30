@@ -262,6 +262,7 @@ export default function ItineraryScreen() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [kbOffset, setKbOffset] = useState(0);
   const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
+  const [wrapperH, setWrapperH] = useState(0);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -633,11 +634,11 @@ export default function ItineraryScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, kbOffset > 0
-            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
-            : { maxHeight: Math.max(200, initVVH.current - 16) }
-          ]}>
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
+          <View
+            style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}
+            onLayout={e => { const h = e.nativeEvent.layout.height; if (h > 0) setWrapperH(h); }}
+          >
+          <ScrollView style={wrapperH > 0 ? { height: wrapperH } : { flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -903,7 +904,7 @@ const styles = StyleSheet.create({
   addDashBox: { flex: 1, marginVertical: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1 },
+  modalScroll: { },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   addTabs: { flexDirection: 'row', gap: 8, marginBottom: 8 },

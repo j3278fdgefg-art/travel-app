@@ -122,6 +122,7 @@ export default function BookingsScreen() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [kbOffset, setKbOffset] = useState(0);
   const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
+  const [wrapperH, setWrapperH] = useState(0);
 
   // refs for Enter key chaining
   const flightNumRef = useRef<any>(null);
@@ -711,11 +712,11 @@ export default function BookingsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, kbOffset > 0
-            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
-            : { maxHeight: Math.max(200, initVVH.current - 16) }
-          ]}>
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
+          <View
+            style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}
+            onLayout={e => { const h = e.nativeEvent.layout.height; if (h > 0) setWrapperH(h); }}
+          >
+          <ScrollView style={wrapperH > 0 ? { height: wrapperH } : { flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingBooking ? '編輯' : '新增'}{BOOKING_TYPES[activeTab]}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -813,7 +814,7 @@ const styles = StyleSheet.create({
   addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1 },
+  modalScroll: { },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },

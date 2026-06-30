@@ -41,6 +41,7 @@ export default function MembersScreen() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [kbOffset, setKbOffset] = useState(0);
   const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
+  const [wrapperH, setWrapperH] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -389,11 +390,11 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, kbOffset > 0
-            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
-            : { maxHeight: Math.max(200, initVVH.current - 16) }
-          ]}>
-          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+          <View
+            style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}
+            onLayout={e => { const h = e.nativeEvent.layout.height; if (h > 0) setWrapperH(h); }}
+          >
+          <ScrollView style={wrapperH > 0 ? { height: wrapperH } : { flex: 1 }} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingMember ? '編輯成員' : '新增成員'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -553,7 +554,7 @@ const styles = StyleSheet.create({
   logTime: { fontSize: 11, color: Colors.textLight },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1 },
+  modalScroll: { },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },

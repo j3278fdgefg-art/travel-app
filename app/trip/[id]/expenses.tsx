@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Modal, TextInput, ActivityIndicator, Platform,
@@ -126,15 +126,6 @@ export default function ExpensesScreen() {
     if (user) setExpenseCats(loadExpenseCats(user.id));
   }, [user]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-    const vv = window.visualViewport;
-    initVVH.current = vv.height;
-    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
 
   const handleAddCat = () => {
     const e = newCatInput.trim();
@@ -250,8 +241,6 @@ export default function ExpensesScreen() {
   };
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [kbOffset, setKbOffset] = useState(0);
-  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
 
   const handleDelete = (e: Expense) => {
     if (confirmDeleteId === e.id) {
@@ -481,11 +470,8 @@ export default function ExpensesScreen() {
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, kbOffset > 0
-            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
-            : { maxHeight: Math.max(200, initVVH.current - 16) }
-          ]}>
-          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
+          <View style={styles.modalBox}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
@@ -677,7 +663,7 @@ const styles = StyleSheet.create({
   addDashBox: { marginHorizontal: 16, marginTop: 8, marginBottom: 8, height: 52, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', paddingTop: 40 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
