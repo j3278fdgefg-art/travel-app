@@ -389,7 +389,10 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
+          <View style={[styles.modalWrapper, kbOffset > 0
+            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
+            : { maxHeight: Math.max(200, initVVH.current - 16) }
+          ]}>
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingMember ? '編輯成員' : '新增成員'}</Text>

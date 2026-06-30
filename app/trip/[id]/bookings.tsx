@@ -711,7 +711,10 @@ export default function BookingsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
+          <View style={[styles.modalWrapper, kbOffset > 0
+            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
+            : { maxHeight: Math.max(200, initVVH.current - 16) }
+          ]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingBooking ? '編輯' : '新增'}{BOOKING_TYPES[activeTab]}</Text>

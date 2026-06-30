@@ -481,7 +481,10 @@ export default function ExpensesScreen() {
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
+          <View style={[styles.modalBox, kbOffset > 0
+            ? { marginBottom: kbOffset, height: Math.max(200, initVVH.current - kbOffset - 16) }
+            : { maxHeight: Math.max(200, initVVH.current - 16) }
+          ]}>
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
