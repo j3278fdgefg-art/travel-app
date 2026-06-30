@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, Platform, useWindowDimensions,
+  SafeAreaView, Modal, TextInput, Platform,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -108,7 +108,6 @@ function TimeInput({
 }
 
 export default function BookingsScreen() {
-  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking, updateBooking, deleteBooking } = useTripStore();
   const { user } = useAuthStore();
@@ -120,6 +119,9 @@ export default function BookingsScreen() {
   const [form, setForm] = useState(emptyForm());
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [visibleTo, setVisibleTo] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [kbOffset, setKbOffset] = useState(0);
+  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
 
   // refs for Enter key chaining
   const flightNumRef = useRef<any>(null);
@@ -139,6 +141,16 @@ export default function BookingsScreen() {
   useEffect(() => {
     if (id) { fetchTripById(id); fetchBookings(id); fetchMembers(id); }
   }, [id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    initVVH.current = vv.height;
+    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
 
   const filtered = bookings.filter((b) => {
     if (b.type !== activeTab) return false;
@@ -258,7 +270,12 @@ export default function BookingsScreen() {
   };
 
   const handleDelete = (b: Booking) => {
-    if (window.confirm(`確定刪除「${b.title}」？`)) deleteBooking(b.id);
+    if (confirmDeleteId === b.id) {
+      deleteBooking(b.id);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(b.id);
+    }
   };
 
   const renderBooking = (b: Booking) => {
@@ -325,9 +342,14 @@ export default function BookingsScreen() {
               <Text style={styles.btnEmoji}>✏️</Text>
               <Text style={styles.editBtnText}>編輯</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(b)}>
+            <TouchableOpacity
+              style={[styles.deleteBtn, confirmDeleteId === b.id && styles.deleteBtnConfirm]}
+              onPress={() => handleDelete(b)}
+            >
               <Text style={styles.btnEmoji}>🗑️</Text>
-              <Text style={styles.deleteBtnText}>刪除</Text>
+              <Text style={[styles.deleteBtnText, confirmDeleteId === b.id && { color: '#fff' }]}>
+                {confirmDeleteId === b.id ? '確認刪除' : '刪除'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -689,7 +711,7 @@ export default function BookingsScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.92 }]}>
+          <View style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingBooking ? '編輯' : '新增'}{BOOKING_TYPES[activeTab]}</Text>
@@ -778,6 +800,7 @@ const styles = StyleSheet.create({
   editBtnText: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#FEE2E2' },
   deleteBtnText: { fontSize: 12, color: Colors.danger, fontWeight: '500' },
+  deleteBtnConfirm: { backgroundColor: Colors.danger },
   emptyCta: { alignItems: 'center', marginTop: 40, paddingVertical: 36, paddingHorizontal: 24, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', backgroundColor: 'rgba(255,255,255,0.5)' },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
@@ -787,8 +810,8 @@ const styles = StyleSheet.create({
   addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1, padding: 24 },
-  modalContent: { paddingBottom: 60 },
+  modalScroll: { },
+  modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },

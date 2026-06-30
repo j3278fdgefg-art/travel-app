@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, useWindowDimensions, Platform,
+  SafeAreaView, Modal, TextInput, Platform,
 } from 'react-native';
 import { useGlobalSearchParams, router } from 'expo-router';
 import dayjs from 'dayjs';
@@ -236,7 +236,6 @@ const emptyForm = () => ({
 });
 
 export default function ItineraryScreen() {
-  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem, favorites, fetchFavorites } = useTripStore();
   const { user } = useAuthStore();
@@ -260,7 +259,9 @@ export default function ItineraryScreen() {
   const [itemWeatherCache, setItemWeatherCache] = useState<Record<string, DayWeather | null>>({});
   const fetchingWeatherRef = useRef(new Set<string>());
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [kbOffset, setKbOffset] = useState(0);
+  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState('');
@@ -272,15 +273,16 @@ export default function ItineraryScreen() {
     if (user) setItemTypes(loadItemTypes(user.id));
   }, [user]);
 
-  // 手機鍵盤彈出時用 visualViewport 偵測高度差，把 modal 往上推
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const vv = (window as any).visualViewport;
-    if (!vv) return;
-    const handler = () => setKbOffset(Math.max(0, window.innerHeight - vv.height));
-    vv.addEventListener('resize', handler);
-    return () => vv.removeEventListener('resize', handler);
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    initVVH.current = vv.height;
+    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
   }, []);
+
 
   useEffect(() => {
     const dest = currentTrip?.destination || currentTrip?.name;
@@ -451,7 +453,12 @@ export default function ItineraryScreen() {
   };
 
   const handleDelete = (item: ItineraryItem) => {
-    if (window.confirm(`確定刪除「${item.title}」？`)) deleteItineraryItem(item.id);
+    if (confirmDeleteId === item.id) {
+      deleteItineraryItem(item.id);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(item.id);
+    }
   };
 
   const openInMap = (item: ItineraryItem) => {
@@ -581,9 +588,14 @@ export default function ItineraryScreen() {
                           <Text style={styles.itemBtnEmoji}>✏️</Text>
                           <Text style={styles.itemBtnLabel}>編輯</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                        <TouchableOpacity
+                          style={[styles.deleteBtn, confirmDeleteId === item.id && styles.deleteBtnConfirm]}
+                          onPress={() => handleDelete(item)}
+                        >
                           <Text style={styles.itemBtnEmoji}>🗑️</Text>
-                          <Text style={[styles.itemBtnLabel, { color: Colors.danger }]}>刪除</Text>
+                          <Text style={[styles.itemBtnLabel, { color: confirmDeleteId === item.id ? '#fff' : Colors.danger }]}>
+                            {confirmDeleteId === item.id ? '確認刪除' : '刪除'}
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -620,8 +632,8 @@ export default function ItineraryScreen() {
       </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={[styles.modalOverlay, { paddingBottom: kbOffset }]}>
-          <View style={[styles.modalWrapper, { maxHeight: (winHeight - kbOffset) * 0.92 }]}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingItem ? '編輯行程' : '新增行程項目'}</Text>
@@ -867,6 +879,7 @@ const styles = StyleSheet.create({
   itemBtns: { flexDirection: 'row', gap: 8, marginTop: 12, justifyContent: 'flex-end' },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  deleteBtnConfirm: { backgroundColor: Colors.danger },
   itemBtnEmoji: { fontSize: 13 },
   itemBtnLabel: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
   transitRow: { flexDirection: 'row', alignItems: 'stretch' },
@@ -887,8 +900,8 @@ const styles = StyleSheet.create({
   addDashBox: { flex: 1, marginVertical: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1, padding: 24 },
-  modalContent: { paddingBottom: 40 },
+  modalScroll: { },
+  modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   addTabs: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   addTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.background, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },

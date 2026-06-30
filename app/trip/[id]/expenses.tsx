@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Modal, TextInput, ActivityIndicator, Platform,
@@ -126,6 +126,16 @@ export default function ExpensesScreen() {
     if (user) setExpenseCats(loadExpenseCats(user.id));
   }, [user]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    initVVH.current = vv.height;
+    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
+
   const handleAddCat = () => {
     const e = newCatInput.trim();
     if (e && !expenseCats.includes(e)) {
@@ -240,6 +250,8 @@ export default function ExpensesScreen() {
   };
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [kbOffset, setKbOffset] = useState(0);
+  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
 
   const handleDelete = (e: Expense) => {
     if (confirmDeleteId === e.id) {
@@ -334,6 +346,11 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* 新增消費 */}
+      <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
+        <Ionicons name="add" size={24} color={Colors.textLight} />
+      </TouchableOpacity>
 
       {/* 消費清單 */}
       <ScrollView contentContainerStyle={styles.list}>
@@ -452,26 +469,19 @@ export default function ExpensesScreen() {
             </View>
           );
         })}
-        {filtered.length === 0 ? (
-          <TouchableOpacity style={styles.emptyCta} onPress={openAdd} activeOpacity={0.8}>
+        {filtered.length === 0 && (
+          <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>💰</Text>
             <Text style={styles.emptyText}>還沒有消費記錄</Text>
-            <Text style={styles.emptySubtext}>記下第一筆花費</Text>
-            <View style={styles.emptyAddBtn}>
-              <Text style={styles.emptyAddText}>＋ 新增消費</Text>
-            </View>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.addDashBox} onPress={openAdd} activeOpacity={0.7}>
-            <Ionicons name="add" size={24} color={Colors.textLight} />
-          </TouchableOpacity>
+            <Text style={styles.emptySubtext}>點上方 + 記下第一筆花費</Text>
+          </View>
         )}
       </ScrollView>
 
       {/* 新增/編輯 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+          <View style={[styles.modalBox, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingExpense ? '編輯消費' : '新增消費'}</Text>
@@ -661,9 +671,10 @@ const styles = StyleSheet.create({
   emptyCta: { alignItems: 'center', marginTop: 40, paddingVertical: 36, paddingHorizontal: 24, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', backgroundColor: 'rgba(255,255,255,0.5)' },
   emptyAddBtn: { marginTop: 18, backgroundColor: Colors.primary, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 14 },
   emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  addDashBox: { marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  addDashBox: { marginHorizontal: 16, marginTop: 8, marginBottom: 8, height: 52, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+  emptyState: { alignItems: 'center', paddingTop: 40 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
+  modalBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },

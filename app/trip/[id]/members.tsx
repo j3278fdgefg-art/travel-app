@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Modal, TextInput, useWindowDimensions,
+  SafeAreaView, Modal, TextInput,
 } from 'react-native';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,6 @@ const DEFAULT_AVATARS = ['😀', '👨', '👩'];
 
 
 export default function MembersScreen() {
-  const { height: winHeight } = useWindowDimensions();
   const params = useGlobalSearchParams<{ id: string }>();
   const { members, currentTrip, activityLogs, fetchMembers, fetchActivityLogs, fetchTripById, addMember, removeMember, logActivity } = useTripStore();
   const { user } = useAuthStore();
@@ -38,6 +37,10 @@ export default function MembersScreen() {
   const [customEmoji, setCustomEmoji] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedPerm, setCopiedPerm] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [kbOffset, setKbOffset] = useState(0);
+  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
 
   useEffect(() => {
     if (id) {
@@ -46,6 +49,16 @@ export default function MembersScreen() {
       fetchActivityLogs(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    initVVH.current = vv.height;
+    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, []);
 
   // 自動將主辦人加入成員列表
   useEffect(() => {
@@ -142,18 +155,26 @@ export default function MembersScreen() {
   };
 
   const handleLeave = async () => {
+    if (!confirmLeave) {
+      setConfirmLeave(true);
+      return;
+    }
     const ownerMem = members.find((m) => m.role === 'owner' && m.user_id === user?.id);
     if (!ownerMem) return;
-    if (window.confirm('確定要退出這個行程嗎？行程仍會保留，但你將從成員列表中移除。')) {
-      await removeMember(ownerMem.id);
-      setModalVisible(false);
-      router.replace('/trips');
-    }
+    await removeMember(ownerMem.id);
+    setModalVisible(false);
+    setConfirmLeave(false);
+    router.replace('/trips');
   };
 
   const handleRemove = (m: TripMember) => {
     if (!isOwner) return;
-    if (window.confirm(`確定要移除 ${m.display_name}？`)) removeMember(m.id);
+    if (confirmRemoveId === m.id) {
+      removeMember(m.id);
+      setConfirmRemoveId(null);
+    } else {
+      setConfirmRemoveId(m.id);
+    }
   };
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://travel-app-app.vercel.app';
@@ -305,8 +326,11 @@ export default function MembersScreen() {
                   activeOpacity={canEdit ? 0.7 : 1}
                 >
                   {isOwner && (
-                    <TouchableOpacity style={styles.cardDelete} onPress={() => handleRemove(m)}>
-                      <Text style={{ fontSize: 12 }}>🗑️</Text>
+                    <TouchableOpacity
+                      style={[styles.cardDelete, confirmRemoveId === m.id && styles.cardDeleteConfirm]}
+                      onPress={() => handleRemove(m)}
+                    >
+                      <Text style={{ fontSize: 12 }}>{confirmRemoveId === m.id ? '⚠️' : '🗑️'}</Text>
                     </TouchableOpacity>
                   )}
                   <View style={styles.avatarCircle}>
@@ -365,7 +389,7 @@ export default function MembersScreen() {
       {/* 新增/編輯成員 Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalWrapper, { maxHeight: winHeight * 0.9 }]}>
+          <View style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}>
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
               <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>{editingMember ? '編輯成員' : '新增成員'}</Text>
@@ -462,8 +486,13 @@ export default function MembersScreen() {
             </View>
 
             {editingMember?.role === 'owner' && editingMember?.user_id === user?.id && (
-              <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
-                <Text style={styles.leaveText}>退出行程</Text>
+              <TouchableOpacity
+                style={[styles.leaveBtn, confirmLeave && styles.leaveBtnConfirm]}
+                onPress={handleLeave}
+              >
+                <Text style={[styles.leaveText, confirmLeave && styles.leaveTextConfirm]}>
+                  {confirmLeave ? '確認退出行程？' : '退出行程'}
+                </Text>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -508,6 +537,7 @@ const styles = StyleSheet.create({
   roleBadgeMemberText: { fontSize: 11, fontWeight: '600', color: '#5A7A4A' },
   contactTag: { fontSize: 10, color: Colors.textLight, marginTop: 3 },
   cardDelete: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 8, backgroundColor: '#FBE8E8', justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  cardDeleteConfirm: { backgroundColor: Colors.danger },
   addCard: { width: '47%', backgroundColor: Colors.card, borderRadius: 16, padding: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.border, borderStyle: 'dashed', minHeight: 130 },
   addCardText: { fontSize: 13, color: Colors.textLight, marginTop: 6 },
   emptyLog: { fontSize: 13, color: Colors.textLight, textAlign: 'center', paddingVertical: 20 },
@@ -520,8 +550,8 @@ const styles = StyleSheet.create({
   logTime: { fontSize: 11, color: Colors.textLight },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalScroll: { flex: 1, padding: 24 },
-  modalContent: { paddingBottom: 40 },
+  modalScroll: { },
+  modalContent: { padding: 24, paddingBottom: 60 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },
@@ -538,8 +568,10 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary, fontSize: 16 },
   createBtn: { flex: 1, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   createText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  leaveBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 10 },
+  leaveBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
   leaveText: { color: Colors.danger, fontSize: 14 },
+  leaveBtnConfirm: { backgroundColor: Colors.danger, paddingHorizontal: 20 },
+  leaveTextConfirm: { color: '#fff', fontWeight: '600' },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
   closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
 });

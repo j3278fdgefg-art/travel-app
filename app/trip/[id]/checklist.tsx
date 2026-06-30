@@ -35,6 +35,7 @@ export default function ChecklistScreen() {
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [editText, setEditText] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) { fetchChecklist(id); fetchMembers(id); }
@@ -69,8 +70,11 @@ export default function ChecklistScreen() {
   };
 
   const handleDelete = (item: ChecklistItem) => {
-    if (window.confirm(`確定刪除「${item.content}」？`)) {
+    if (confirmDeleteId === item.id) {
       deleteChecklistItem(item.id);
+      setConfirmDeleteId(null);
+    } else {
+      setConfirmDeleteId(item.id);
     }
   };
 
@@ -156,8 +160,11 @@ export default function ChecklistScreen() {
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleEdit(item)}>
                     <Text style={styles.actionEmoji}>✏️</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={() => handleDelete(item)}>
-                    <Text style={styles.actionEmoji}>🗑️</Text>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnDanger, confirmDeleteId === item.id && styles.actionBtnConfirm]}
+                    onPress={() => handleDelete(item)}
+                  >
+                    <Text style={styles.actionEmoji}>{confirmDeleteId === item.id ? '⚠️' : '🗑️'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -290,6 +297,7 @@ const styles = StyleSheet.create({
   itemActions: { flexDirection: 'row', gap: 4 },
   actionBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
   actionBtnDanger: { backgroundColor: '#FBE8E8', borderColor: '#FBE8E8' },
+  actionBtnConfirm: { backgroundColor: Colors.danger, borderColor: Colors.danger },
   actionEmoji: { fontSize: 14 },
   emptyText: { fontSize: 13, color: Colors.textLight, textAlign: 'center', paddingVertical: 16 },
   suggestionTitle: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500', marginBottom: 10 },

@@ -256,7 +256,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   addBooking: async (booking) => {
     const { data, error } = await supabase.from('bookings').insert(booking).select().single();
-    if (error) console.error('addBooking error:', error);
+    if (error) { alert('新增失敗：' + error.message); return; }
     if (data) set((s) => ({ bookings: [...s.bookings, data] }));
   },
 
