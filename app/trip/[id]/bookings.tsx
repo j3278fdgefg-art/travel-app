@@ -120,8 +120,6 @@ export default function BookingsScreen() {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [visibleTo, setVisibleTo] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [kbOffset, setKbOffset] = useState(0);
-  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
   const [wrapperH, setWrapperH] = useState(0);
 
   // refs for Enter key chaining
@@ -144,14 +142,16 @@ export default function BookingsScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-    const vv = window.visualViewport;
-    initVVH.current = vv.height;
-    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+    if (!modalVisible || typeof document === 'undefined') return;
+    const onFocusIn = (e: FocusEvent) => {
+      const el = e.target as Element;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, [modalVisible]);
 
   const filtered = bookings.filter((b) => {
     if (b.type !== activeTab) return false;
@@ -713,7 +713,7 @@ export default function BookingsScreen() {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View
-            style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}
+            style={styles.modalWrapper}
             onLayout={e => { const h = e.nativeEvent.layout.height; if (h > 0) setWrapperH(h); }}
           >
           <ScrollView style={wrapperH > 0 ? { height: wrapperH } : { flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
@@ -813,9 +813,9 @@ const styles = StyleSheet.create({
   emptyAddText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   addDashBox: { marginHorizontal: 16, marginTop: 12, marginBottom: 24, height: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
   modalScroll: { },
-  modalContent: { padding: 24, paddingBottom: 60 },
+  modalContent: { padding: 24, paddingBottom: 320 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, textAlign: 'center' },
   label: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginBottom: 6, marginTop: 12 },
   input: { height: 46, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border },

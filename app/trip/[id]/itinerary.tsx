@@ -260,8 +260,6 @@ export default function ItineraryScreen() {
   const fetchingWeatherRef = useRef(new Set<string>());
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [kbOffset, setKbOffset] = useState(0);
-  const initVVH = useRef(typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 800);
   const [wrapperH, setWrapperH] = useState(0);
   const [itemTypes, setItemTypes] = useState(DEFAULT_ITEM_TYPES);
   const [addingType, setAddingType] = useState(false);
@@ -275,14 +273,16 @@ export default function ItineraryScreen() {
   }, [user]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-    const vv = window.visualViewport;
-    initVVH.current = vv.height;
-    const update = () => setKbOffset(Math.max(0, initVVH.current - vv.height));
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
-  }, []);
+    if (!modalVisible || typeof document === 'undefined') return;
+    const onFocusIn = (e: FocusEvent) => {
+      const el = e.target as Element;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+      }
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, [modalVisible]);
 
 
   useEffect(() => {
@@ -635,7 +635,7 @@ export default function ItineraryScreen() {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View
-            style={[styles.modalWrapper, { marginBottom: kbOffset, maxHeight: Math.max(200, initVVH.current - kbOffset - 16) }]}
+            style={styles.modalWrapper}
             onLayout={e => { const h = e.nativeEvent.layout.height; if (h > 0) setWrapperH(h); }}
           >
           <ScrollView style={wrapperH > 0 ? { height: wrapperH } : { flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
@@ -903,9 +903,9 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 13, color: Colors.textSecondary, marginTop: 6 },
   addDashBox: { flex: 1, marginVertical: 4, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalWrapper: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
   modalScroll: { },
-  modalContent: { padding: 24, paddingBottom: 60 },
+  modalContent: { padding: 24, paddingBottom: 320 },
   modalTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },
   addTabs: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   addTab: { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.background, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
