@@ -328,13 +328,16 @@ export const useTripStore = create<TripStore>((set, get) => ({
   },
 
   logActivity: async (tripId, memberName, action, detail = '') => {
-    await supabase.from('activity_logs').insert({ trip_id: tripId, member_name: memberName, action, detail });
-    const { data } = await supabase.from('activity_logs').select('*').eq('trip_id', tripId).order('created_at', { ascending: false }).limit(50);
+    const { error: insertError } = await supabase.from('activity_logs').insert({ trip_id: tripId, member_name: memberName, action, detail });
+    if (insertError) console.error('logActivity insert error:', insertError);
+    const { data, error } = await supabase.from('activity_logs').select('*').eq('trip_id', tripId).order('created_at', { ascending: false }).limit(50);
+    if (error) console.error('logActivity fetch error:', error);
     set({ activityLogs: data || [] });
   },
 
   fetchActivityLogs: async (tripId) => {
-    const { data } = await supabase.from('activity_logs').select('*').eq('trip_id', tripId).order('created_at', { ascending: false }).limit(50);
+    const { data, error } = await supabase.from('activity_logs').select('*').eq('trip_id', tripId).order('created_at', { ascending: false }).limit(50);
+    if (error) console.error('fetchActivityLogs error:', error);
     set({ activityLogs: data || [] });
   },
 

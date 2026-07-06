@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, TextInput, Modal,
+  SafeAreaView, TextInput, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import { useGlobalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useTripStore } from '../../../store/tripStore';
+import { useAuthStore } from '../../../store/authStore';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { PageBackground } from '../../../components/PageBackground';
 import { ChecklistItem } from '../../../types';
+import { supabase } from '../../../lib/supabase';
 
 const TABS: Array<{ key: ChecklistItem['type']; label: string; emoji: string }> = [
   { key: 'todo', label: '待辦', emoji: '✅' },
@@ -23,11 +25,52 @@ const SUGGESTIONS: Record<ChecklistItem['type'], string[]> = {
   shopping: ['藥妝', '零食', '伴手禮', '文具'],
 };
 
+// 壓縮圖片後再上傳，避免手機拍照原檔過大
+const compressImage = (file: File, maxSize = 1280, quality = 0.8): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('no canvas context')); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('壓縮失敗'))), 'image/jpeg', quality);
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+const uploadChecklistImage = async (file: File, tripId: string): Promise<string | null> => {
+  try {
+    const blob = await compressImage(file);
+    const path = `${tripId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const { error } = await supabase.storage.from('checklist-photos').upload(path, blob, { contentType: 'image/jpeg' });
+    if (error) { console.error('uploadChecklistImage error:', error); alert('照片上傳失敗：' + error.message); return null; }
+    const { data } = supabase.storage.from('checklist-photos').getPublicUrl(path);
+    return data.publicUrl;
+  } catch (e: any) {
+    console.error('uploadChecklistImage error:', e);
+    alert('照片上傳失敗：' + (e?.message || '未知錯誤'));
+    return null;
+  }
+};
+
 export default function ChecklistScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, checklist, members, fetchChecklist, fetchMembers, addChecklistItem, toggleChecklistItem, deleteChecklistItem, updateChecklistItem } = useTripStore();
+  const { currentTrip, checklist, members, fetchChecklist, fetchMembers, addChecklistItem, toggleChecklistItem, deleteChecklistItem, updateChecklistItem, logActivity } = useTripStore();
+  const { user } = useAuthStore();
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
+  const myDisplayName = members.find((m) => m.user_id === user?.id)?.display_name || user?.email?.split('@')[0] || '成員';
   const [activeTab, setActiveTab] = useState<ChecklistItem['type']>('todo');
   const [newItem, setNewItem] = useState('');
   const [newShopName, setNewShopName] = useState('');
@@ -36,6 +79,9 @@ export default function ChecklistScreen() {
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [editText, setEditText] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) { fetchChecklist(id); fetchMembers(id); }
@@ -50,28 +96,61 @@ export default function ChecklistScreen() {
     );
   };
 
+  const pickImage = () => {
+    if (typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+      document.body.removeChild(input);
+    };
+    document.body.appendChild(input);
+    input.click();
+  };
+
+  const removePendingImage = () => {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
+  };
+
   const handleAdd = async () => {
     const itemText = newItem.trim();
-    if (!itemText) return;
-    let content = itemText;
+    if (!itemText && !pendingImage) return;
+    let content = itemText || '（無說明）';
     if (activeTab === 'shopping' && newShopName.trim()) {
-      content = `${newShopName.trim()}｜${itemText}`;
+      content = `${newShopName.trim()}｜${content}`;
     }
     const memberName = selectedMembers.length > 0 ? selectedMembers.join(',') : null;
-    await addChecklistItem({ trip_id: id, type: activeTab, content, is_done: false, member_name: memberName });
+    let image_url: string | null = null;
+    if (pendingImage) {
+      setUploadingImage(true);
+      image_url = await uploadChecklistImage(pendingImage.file, id);
+      setUploadingImage(false);
+    }
+    await addChecklistItem({
+      trip_id: id, type: activeTab, content, is_done: false, member_name: memberName,
+      ...(image_url ? { image_url } : {}),
+    });
+    logActivity(id, myDisplayName, '新增準備項目', `${TABS.find((t) => t.key === activeTab)?.label} ${content}`);
     setNewItem('');
     if (activeTab === 'shopping') setNewShopName('');
+    removePendingImage();
   };
 
   const handleSuggestion = async (text: string) => {
     const exists = checklist.find((i) => i.content === text && i.type === activeTab);
     if (exists) return;
     await addChecklistItem({ trip_id: id, type: activeTab, content: text, is_done: false });
+    logActivity(id, myDisplayName, '新增準備項目', `${TABS.find((t) => t.key === activeTab)?.label} ${text}`);
   };
 
   const handleDelete = (item: ChecklistItem) => {
     if (confirmDeleteId === item.id) {
       deleteChecklistItem(item.id);
+      logActivity(id, myDisplayName, '刪除準備項目', item.content);
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(item.id);
@@ -86,6 +165,7 @@ export default function ChecklistScreen() {
   const handleSaveEdit = async () => {
     if (!editingItem || !editText.trim()) return;
     await updateChecklistItem(editingItem.id, editText.trim());
+    logActivity(id, myDisplayName, '編輯準備項目', `${editingItem.content} → ${editText.trim()}`);
     setEditingItem(null);
   };
 
@@ -143,6 +223,11 @@ export default function ChecklistScreen() {
                     {item.is_done && <Ionicons name="checkmark" size={14} color="#fff" />}
                   </View>
                 </TouchableOpacity>
+                {!!item.image_url && (
+                  <TouchableOpacity onPress={() => setViewImageUrl(item.image_url!)}>
+                    <Image source={{ uri: item.image_url }} style={styles.itemThumb} />
+                  </TouchableOpacity>
+                )}
                 <View style={{ flex: 1, minWidth: 0 }} onTouchEnd={() => toggleChecklistItem(item.id, !item.is_done)}>
                   {!!shop && <Text style={styles.shopLabel} numberOfLines={1}>{shop}</Text>}
                   <Text style={[styles.itemText, item.is_done && styles.itemTextDone]} numberOfLines={2}>{text}</Text>
@@ -212,8 +297,22 @@ export default function ChecklistScreen() {
             {selectedMembers.length === 0 ? '👥' : `${selectedMembers.length}人`}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
-          <Ionicons name="add" size={24} color="#fff" />
+        {activeTab === 'shopping' && (
+          <TouchableOpacity style={styles.photoBtn} onPress={pendingImage ? removePendingImage : pickImage}>
+            {pendingImage ? (
+              <>
+                <Image source={{ uri: pendingImage.previewUrl }} style={styles.photoBtnThumb} />
+                <View style={styles.photoBtnRemoveBadge}>
+                  <Text style={styles.photoBtnRemoveText}>✕</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.photoBtnEmoji}>📷</Text>
+            )}
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={uploadingImage}>
+          {uploadingImage ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="add" size={24} color="#fff" />}
         </TouchableOpacity>
       </View>
 
@@ -266,6 +365,13 @@ export default function ChecklistScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 照片放大檢視 */}
+      <Modal visible={!!viewImageUrl} animationType="fade" transparent onRequestClose={() => setViewImageUrl(null)}>
+        <TouchableOpacity style={styles.lightboxOverlay} activeOpacity={1} onPress={() => setViewImageUrl(null)}>
+          {!!viewImageUrl && <Image source={{ uri: viewImageUrl }} style={styles.lightboxImage} resizeMode="contain" />}
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -287,6 +393,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 99 },
   itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.background, gap: 10 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  itemThumb: { width: 40, height: 40, borderRadius: 8 },
   checkboxDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   shopLabel: { fontSize: 10, color: Colors.primary, fontWeight: '600', marginBottom: 1 },
   itemText: { fontSize: 15, color: Colors.text },
@@ -308,6 +415,11 @@ const styles = StyleSheet.create({
   shopInput: { width: 88 },
   memberBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
   memberBtnText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+  photoBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
+  photoBtnEmoji: { fontSize: 18 },
+  photoBtnThumb: { width: 42, height: 42, borderRadius: 11 },
+  photoBtnRemoveBadge: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.danger, justifyContent: 'center', alignItems: 'center' },
+  photoBtnRemoveText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   addBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   pickerBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
@@ -326,4 +438,6 @@ const styles = StyleSheet.create({
   cancelText: { color: Colors.textSecondary },
   saveBtn: { flex: 1, height: 46, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
   saveText: { color: '#fff', fontWeight: '600' },
+  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  lightboxImage: { width: '92%', height: '80%' },
 });

@@ -94,6 +94,7 @@ export interface ChecklistItem {
   type: 'todo' | 'packing' | 'shopping';
   content: string;
   is_done: boolean;
+  image_url?: string | null;
   created_at: string;
 }
 

@@ -622,23 +622,29 @@ export default function MapScreen() {
     window.location.href = scheme;
   };
 
-  const navigateToPlace = (p: any) => {
-    if (!p) return;
-    const dest = (p.lat !== undefined && p.lng !== undefined) ? `${p.lat},${p.lng}` : (p.name || '');
-    const enc = encodeURIComponent(dest);
-    const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${enc}`;
+  const openMapUrl = (schemeUrl: string, webUrl: string) => {
     const ua = navigator.userAgent;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
-    if (!isMobile) { window.open(webUrl, 'travelExt'); return; }
-    const scheme = /Android/i.test(ua) ? `google.navigation:q=${enc}` : `comgooglemaps://?daddr=${enc}&directionsmode=driving`;
-    let timer: any;
-    const cleanup = () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('blur', cancel); };
-    const cancel = () => { if (timer) clearTimeout(timer); cleanup(); };
-    const onVis = () => { if (document.hidden) cancel(); };
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('blur', cancel);
-    timer = setTimeout(() => { cleanup(); window.open(webUrl, 'travelExt'); }, 1500);
-    window.location.href = scheme;
+    if (!/iPhone|iPad|iPod|Android/i.test(ua)) {
+      window.open(webUrl, '_blank');
+      return;
+    }
+    // Use hidden anchor click to bypass router interception and reliably trigger URL scheme on iOS/Android
+    const a = document.createElement('a');
+    a.href = schemeUrl;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const navigateToPlace = (p: any) => {
+    if (!p || p.lat === undefined || p.lng === undefined) return;
+    const lat = p.lat, lng = p.lng;
+    const ua = navigator.userAgent;
+    const scheme = /Android/i.test(ua)
+      ? `google.navigation:q=${lat},${lng}`
+      : `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
+    openMapUrl(scheme, `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
   };
 
   // 在地圖放標記並平移（無 place_id 時用座標）
@@ -906,16 +912,22 @@ export default function MapScreen() {
             {/* 標題行：名稱 ↗導航 🗺️Google Maps ❤️收藏 ✕關閉 */}
             <View style={styles.placeHeaderBar}>
               <Text style={[styles.placeCardName, { flex: 1 }]} numberOfLines={1}>{place.name}</Text>
-              <TouchableOpacity style={styles.infoActionBtn} onPress={() => place.lat !== undefined && computeRoute({ lat: place.lat, lng: place.lng, name: place.name }, 'DRIVING')} disabled={routing}>
+              <TouchableOpacity style={styles.infoActionBtn} onPress={() => navigateToPlace(place)}>
                 <Text style={[styles.ctrlBtnEmoji, { color: Colors.primary, fontWeight: '700', fontSize: 16 }]}>↗</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.infoActionBtn}
                 onPress={() => {
-                  const url = place.placeId
+                  if (place.lat === undefined || place.lng === undefined) return;
+                  const lat = place.lat, lng = place.lng;
+                  const ua = navigator.userAgent;
+                  const scheme = /Android/i.test(ua)
+                    ? `geo:${lat},${lng}?q=${lat},${lng}`
+                    : `comgooglemaps://?q=${lat},${lng}&zoom=16`;
+                  const web = place.placeId
                     ? `https://www.google.com/maps/place/?q=place_id:${place.placeId}`
-                    : `https://www.google.com/maps?q=${place.lat},${place.lng}`;
-                  window.open(url, 'travelExt');
+                    : `https://www.google.com/maps?q=${lat},${lng}`;
+                  openMapUrl(scheme, web);
                 }}
               >
                 <Text style={styles.openGmapText}>🗺️</Text>

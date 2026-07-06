@@ -3,11 +3,12 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useGlobalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
 
 export default function RegisterScreen() {
+  const { redirect } = useGlobalSearchParams<{ redirect?: string }>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +35,7 @@ export default function RegisterScreen() {
       setErrorMsg(error);
     } else {
       setSuccessMsg('註冊成功！正在跳轉到登入頁...');
-      setTimeout(() => router.replace('/(auth)/login'), 1500);
+      setTimeout(() => router.replace({ pathname: '/(auth)/login', params: redirect ? { redirect } : {} } as any), 1500);
     }
   };
 
@@ -89,7 +90,7 @@ export default function RegisterScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>註冊</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+        <TouchableOpacity onPress={() => router.replace({ pathname: '/(auth)/login', params: redirect ? { redirect } : {} } as any)}>
           <Text style={styles.link}>已有帳號？返回登入</Text>
         </TouchableOpacity>
       </ScrollView>

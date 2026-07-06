@@ -106,6 +106,7 @@ export default function ExpensesScreen() {
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
   const isOwner = currentTrip?.owner_id != null && user?.id != null && currentTrip.owner_id === user.id;
+  const myDisplayName = members.find((m) => m.user_id === user?.id)?.display_name || user?.email?.split('@')[0] || '成員';
 
   const [filterMembers, setFilterMembers] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -222,7 +223,7 @@ export default function ExpensesScreen() {
         payment_method: form.payMethod, category: dbCategory, date: form.date,
         shared_with: sharedWith, note: form.note,
       } as any);
-      await logActivity(id, ownerName, '編輯消費', `修改「${form.title}」`);
+      await logActivity(id, myDisplayName, '編輯消費', `修改「${form.title}」`);
       setSaving(false);
       setModalVisible(false);
     } else {
@@ -234,7 +235,7 @@ export default function ExpensesScreen() {
       } as any);
       setSaving(false);
       if (ok) {
-        await logActivity(id, form.paidBy || ownerName, '新增消費', `${form.title} ${form.currency} ${amtNum.toLocaleString()}`);
+        await logActivity(id, myDisplayName, '新增消費', `${form.title} ${form.currency} ${amtNum.toLocaleString()}`);
         setModalVisible(false);
       }
     }
@@ -245,7 +246,7 @@ export default function ExpensesScreen() {
   const handleDelete = (e: Expense) => {
     if (confirmDeleteId === e.id) {
       deleteExpense(e.id);
-      logActivity(id, members.find((m) => m.role === 'owner')?.display_name || '主辦人', '刪除消費', e.title);
+      logActivity(id, myDisplayName, '刪除消費', e.title);
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(e.id);

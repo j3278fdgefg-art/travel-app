@@ -109,7 +109,7 @@ function TimeInput({
 
 export default function BookingsScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking, updateBooking, deleteBooking } = useTripStore();
+  const { currentTrip, bookings, members, fetchBookings, fetchMembers, fetchTripById, addBooking, updateBooking, deleteBooking, logActivity } = useTripStore();
   const { user } = useAuthStore();
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
@@ -136,6 +136,7 @@ export default function BookingsScreen() {
   const noteRef = useRef<any>(null);
 
   const myMemberName = members.find((m) => m.user_id === user?.id)?.display_name || '';
+  const actorName = myMemberName || user?.email?.split('@')[0] || '成員';
 
   useEffect(() => {
     if (id) { fetchTripById(id); fetchBookings(id); fetchMembers(id); }
@@ -260,12 +261,14 @@ export default function BookingsScreen() {
 
     if (editingBooking) {
       await updateBooking(editingBooking.id, payload);
+      logActivity(id, actorName, '編輯預訂', `${BOOKING_TYPES[activeTab]} ${payload.title || ''}`);
     } else {
       await addBooking({
         ...payload,
         created_by_user_id: user?.id || '',
         created_by_name: myMemberName || user?.email || '',
       } as any);
+      logActivity(id, actorName, '新增預訂', `${BOOKING_TYPES[activeTab]} ${payload.title || ''}`);
     }
     setModalVisible(false);
   };
@@ -273,6 +276,7 @@ export default function BookingsScreen() {
   const handleDelete = (b: Booking) => {
     if (confirmDeleteId === b.id) {
       deleteBooking(b.id);
+      logActivity(id, actorName, '刪除預訂', `${BOOKING_TYPES[b.type]} ${b.title}`);
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(b.id);

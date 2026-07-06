@@ -143,7 +143,10 @@ export default function JoinTripScreen() {
       {!user ? (
         <>
           <Text style={styles.hint}>請先登入才能加入行程</Text>
-          <TouchableOpacity style={styles.btn} onPress={() => router.push('/(auth)/login' as any)}>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { redirect: `/join/${id}?${pt ? `pt=${pt}` : `ot=${ot}`}` } } as any)}
+          >
             <Text style={styles.btnText}>前往登入</Text>
           </TouchableOpacity>
         </>

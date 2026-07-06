@@ -25,6 +25,7 @@ export default function MembersScreen() {
   const router = useRouter();
   const id = params.id || currentTrip?.id || '';
   const isOwner = currentTrip?.owner_id === user?.id;
+  const myDisplayName = members.find((m) => m.user_id === user?.id)?.display_name || user?.email?.split('@')[0] || '成員';
   const ownerAutoAdded = useRef(false);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -115,7 +116,7 @@ export default function MembersScreen() {
       return;
     }
 
-    const actorName = user?.email || '主辦人';
+    const actorName = myDisplayName;
 
     if (editingMember) {
       const oldName = editingMember.display_name;
@@ -160,10 +161,10 @@ export default function MembersScreen() {
       setConfirmLeave(true);
       return;
     }
-    const ownerMem = members.find((m) => m.role === 'owner' && m.user_id === user?.id);
-    if (!ownerMem) return;
-    await removeMember(ownerMem.id);
-    setModalVisible(false);
+    const myMember = members.find((m) => m.user_id === user?.id);
+    if (!myMember) return;
+    await logActivity(id, myMember.display_name, '退出旅程');
+    await removeMember(myMember.id);
     setConfirmLeave(false);
     router.replace('/trips');
   };
@@ -172,6 +173,7 @@ export default function MembersScreen() {
     if (!isOwner) return;
     if (confirmRemoveId === m.id) {
       removeMember(m.id);
+      logActivity(id, myDisplayName, '刪除成員', m.display_name);
       setConfirmRemoveId(null);
     } else {
       setConfirmRemoveId(m.id);
@@ -234,6 +236,7 @@ export default function MembersScreen() {
     if (action.includes('編輯') || action.includes('修改')) return '✏️';
     if (action.includes('刪除')) return '🗑️';
     if (action.includes('加入')) return '👋';
+    if (action.includes('退出')) return '🚪';
     return '📝';
   };
 
@@ -319,6 +322,7 @@ export default function MembersScreen() {
             {/* 其他成員 */}
             {nonOwnerMembers.map((m) => {
               const canEdit = isOwner || m.user_id === user?.id;
+              const isMe = m.user_id === user?.id && !isOwner;
               return (
                 <TouchableOpacity
                   key={m.id}
@@ -343,6 +347,16 @@ export default function MembersScreen() {
                   </View>
                   {!!m.line_id && <Text style={styles.contactTag}>💬 {m.line_id}</Text>}
                   {!!m.ig_handle && <Text style={styles.contactTag}>📸 {m.ig_handle}</Text>}
+                  {isMe && (
+                    <TouchableOpacity
+                      style={[styles.leaveCardBtn, confirmLeave && styles.leaveCardBtnConfirm]}
+                      onPress={(e) => { e.stopPropagation?.(); handleLeave(); }}
+                    >
+                      <Text style={[styles.leaveCardText, confirmLeave && styles.leaveCardTextConfirm]}>
+                        {confirmLeave ? '確認退出？' : '退出旅程'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -576,6 +590,10 @@ const styles = StyleSheet.create({
   leaveText: { color: Colors.danger, fontSize: 14 },
   leaveBtnConfirm: { backgroundColor: Colors.danger, paddingHorizontal: 20 },
   leaveTextConfirm: { color: '#fff', fontWeight: '600' },
+  leaveCardBtn: { marginTop: 8, paddingVertical: 5, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: Colors.danger },
+  leaveCardBtnConfirm: { backgroundColor: Colors.danger, borderColor: Colors.danger },
+  leaveCardText: { color: Colors.danger, fontSize: 11, fontWeight: '600' },
+  leaveCardTextConfirm: { color: '#fff' },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' },
   closeBtnText: { fontSize: 16, color: Colors.textSecondary, fontWeight: '600' },
 });

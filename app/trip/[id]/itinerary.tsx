@@ -237,10 +237,11 @@ const emptyForm = () => ({
 
 export default function ItineraryScreen() {
   const params = useGlobalSearchParams<{ id: string }>();
-  const { currentTrip, days, items, fetchDays, fetchItems, fetchTripById, addItineraryItem, deleteItineraryItem, updateItineraryItem, favorites, fetchFavorites } = useTripStore();
+  const { currentTrip, days, items, members, fetchDays, fetchItems, fetchTripById, fetchMembers, addItineraryItem, deleteItineraryItem, updateItineraryItem, favorites, fetchFavorites, logActivity } = useTripStore();
   const { user } = useAuthStore();
   const { background } = useSettingsStore();
   const id = params.id || currentTrip?.id || '';
+  const myDisplayName = members.find((m) => m.user_id === user?.id)?.display_name || user?.email?.split('@')[0] || '成員';
 
   const [selectedDay, setSelectedDay] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
@@ -266,7 +267,7 @@ export default function ItineraryScreen() {
   const [newTypeInput, setNewTypeInput] = useState('');
   const minInputRef = useRef<any>(null);
 
-  useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); fetchFavorites(id); } }, [id]);
+  useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); fetchFavorites(id); fetchMembers(id); } }, [id]);
 
   useEffect(() => {
     if (user) setItemTypes(loadItemTypes(user.id));
@@ -439,6 +440,7 @@ export default function ItineraryScreen() {
         place_id: form.placeId || undefined,
         note: form.note, type: toDbType(form.type) as any,
       });
+      logActivity(id, myDisplayName, '編輯行程項目', `Day ${day.day_number} ${form.title}`);
     } else {
       await addItineraryItem({
         trip_id: id, day_id: day.id,
@@ -449,6 +451,7 @@ export default function ItineraryScreen() {
         note: form.note, type: toDbType(form.type) as any,
         order_index: currentDayItems.length,
       });
+      logActivity(id, myDisplayName, '新增行程項目', `Day ${day.day_number} ${form.title}`);
     }
     setModalVisible(false);
   };
@@ -456,6 +459,7 @@ export default function ItineraryScreen() {
   const handleDelete = (item: ItineraryItem) => {
     if (confirmDeleteId === item.id) {
       deleteItineraryItem(item.id);
+      logActivity(id, myDisplayName, '刪除行程項目', item.title);
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(item.id);
@@ -492,18 +496,6 @@ export default function ItineraryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <PageBackground variant={background} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/trips')} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.tripName} numberOfLines={1}>{currentTrip?.name ?? '行程'}</Text>
-          <Text style={styles.tripDate}>
-            {currentTrip ? `${dayjs(currentTrip.start_date).format('YYYY/MM/DD')} - ${dayjs(currentTrip.end_date).format('MM/DD')}` : ''}
-          </Text>
-        </View>
-      </View>
-
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
         {days.map((day, idx) => {
@@ -843,10 +835,6 @@ export default function ItineraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.primaryDark },
-  backBtn: { marginRight: 10, padding: 4 },
-  tripName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  tripDate: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   dayScroll: { maxHeight: 88, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border },
   dayScrollContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   dayBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.background, alignItems: 'center', minWidth: 64 },

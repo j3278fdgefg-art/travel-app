@@ -3,11 +3,12 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useGlobalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
 
 export default function LoginScreen() {
+  const { redirect } = useGlobalSearchParams<{ redirect?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (!authLoading && session) {
-      router.replace('/trips');
+      router.replace((redirect as any) || '/trips');
     }
   }, [authLoading, session]);
 
@@ -32,7 +33,7 @@ export default function LoginScreen() {
     if (error) {
       setErrorMsg(error);
     } else {
-      router.replace('/trips');
+      router.replace((redirect as any) || '/trips');
     }
   };
 
@@ -78,7 +79,7 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+        <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: redirect ? { redirect } : {} } as any)}>
           <Text style={styles.link}>還沒有帳號？立即註冊</Text>
         </TouchableOpacity>
       </View>
