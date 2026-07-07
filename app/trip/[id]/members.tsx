@@ -201,34 +201,54 @@ export default function MembersScreen() {
     return `${origin}/join/${id}?pt=${token}`;
   };
 
+  // 手機瀏覽器（尤其 iOS Safari）要求 window.open/clipboard 必須緊跟著點擊動作同步執行，
+  // await 完才呼叫常常會被靜默擋掉、毫無反應——所以先同步開好分頁，內容晚點再補上
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      try {
+        window.prompt('複製連結（已選取，按 Ctrl/Cmd+C 複製）：', text);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
   const shareLinePerm = async () => {
+    const win = window.open('', '_blank');
     const url = await getPermanentLink();
-    if (!url) return;
+    if (!url) { win?.close(); return; }
     const msg = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${url}`;
-    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank');
+    if (win) win.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
   };
 
   const copyPermLink = async () => {
     const url = await getPermanentLink();
     if (!url) return;
-    await navigator.clipboard.writeText(url);
-    setCopiedPerm(true);
-    setTimeout(() => setCopiedPerm(false), 2500);
+    if (await copyToClipboard(url)) {
+      setCopiedPerm(true);
+      setTimeout(() => setCopiedPerm(false), 2500);
+    }
   };
 
   const shareLine = async () => {
+    const win = window.open('', '_blank');
     const url = await generateLink();
-    if (!url) return;
+    if (!url) { win?.close(); return; }
     const msg = `加入我的旅程「${currentTrip?.name ?? '旅程'}」！點連結加入一起計畫 ✈️\n${url}`;
-    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank');
+    if (win) win.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
   };
 
   const copyLink = async () => {
     const url = await generateLink();
     if (!url) return;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    if (await copyToClipboard(url)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
   };
 
   const actionIcon = (action: string) => {
