@@ -278,21 +278,23 @@ export default function MembersScreen() {
             <Text style={styles.syncText}>雲端即時同步中</Text>
           </View>
 
-          {/* 分享按鈕列（僅主辦人） */}
+          {/* 一次性邀請：主辦人和一般成員都能發 */}
+          <Text style={styles.shareSectionLabel}>一次性邀請（5 分鐘，用後失效）</Text>
+          <View style={styles.shareRow}>
+            <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
+              <Text style={styles.shareIcon}>💬</Text>
+              <Text style={styles.shareBtnText}>LINE 分享</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
+              <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
+              <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
+            </TouchableOpacity>
+          </View>
+          {copied && <Text style={styles.copiedHint}>已複製！（5 分鐘有效，使用後失效）</Text>}
+
+          {/* 永久邀請：僅主辦人 */}
           {isOwner && (
             <>
-              <Text style={styles.shareSectionLabel}>一次性邀請（5 分鐘，用後失效）</Text>
-              <View style={styles.shareRow}>
-                <TouchableOpacity style={styles.shareBtn} onPress={shareLine}>
-                  <Text style={styles.shareIcon}>💬</Text>
-                  <Text style={styles.shareBtnText}>LINE 分享</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.shareBtn} onPress={copyLink}>
-                  <Text style={styles.shareIcon}>{copied ? '✅' : '🔗'}</Text>
-                  <Text style={styles.shareBtnText}>{copied ? '已複製' : '複製連結'}</Text>
-                </TouchableOpacity>
-              </View>
-              {copied && <Text style={styles.copiedHint}>已複製！（5 分鐘有效，使用後失效）</Text>}
               <Text style={[styles.shareSectionLabel, { marginTop: 10 }]}>永久邀請（可重複使用）</Text>
               <View style={styles.shareRow}>
                 <TouchableOpacity style={styles.shareBtn} onPress={shareLinePerm}>
