@@ -231,8 +231,8 @@ function saveItemTypes(userId: string, list: string[]) {
 const favCatSelectStyle: any = {
   height: 40, borderRadius: 10, border: `1px solid ${Colors.border}`,
   paddingLeft: 10, paddingRight: 10, fontSize: 14, color: Colors.text,
-  backgroundColor: Colors.background, marginHorizontal: 4, marginVertical: 8,
-  fontFamily: 'inherit',
+  backgroundColor: Colors.background, marginTop: 8, marginBottom: 14,
+  fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', display: 'block',
 };
 
 function loadFavCatFilter(tripId: string): string {

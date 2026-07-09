@@ -285,7 +285,7 @@ export default function ChecklistScreen() {
         )}
         <View style={styles.addBarRow}>
           <TextInput
-            style={[styles.addInput, { flex: 1 }]}
+            style={[styles.addInput, { flex: 1, minWidth: 0 }]}
             value={newItem}
             onChangeText={setNewItem}
             placeholder="新增項目..."
@@ -416,14 +416,14 @@ const styles = StyleSheet.create({
   addBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addInput: { height: 44, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text },
   shopInputFull: { width: '100%' },
-  memberBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  memberBtn: { width: 44, height: 44, flexShrink: 0, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
   memberBtnText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
-  photoBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
+  photoBtn: { width: 44, height: 44, flexShrink: 0, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
   photoBtnEmoji: { fontSize: 18 },
   photoBtnThumb: { width: 42, height: 42, borderRadius: 11 },
   photoBtnRemoveBadge: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.danger, justifyContent: 'center', alignItems: 'center' },
   photoBtnRemoveText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  addBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
+  addBtn: { width: 44, height: 44, flexShrink: 0, borderRadius: 12, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   pickerBox: { backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
   pickerTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 14 },
