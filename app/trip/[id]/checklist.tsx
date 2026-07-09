@@ -271,11 +271,11 @@ export default function ChecklistScreen() {
         </View>
       </ScrollView>
 
-      {/* 新增列 */}
+      {/* 新增列：想買分頁多了店名跟拍照，手機版寬度放不下，店名獨立一行 */}
       <View style={styles.addBar}>
         {activeTab === 'shopping' && (
           <TextInput
-            style={[styles.addInput, styles.shopInput]}
+            style={[styles.addInput, styles.shopInputFull]}
             value={newShopName}
             onChangeText={setNewShopName}
             placeholder="店名"
@@ -283,37 +283,39 @@ export default function ChecklistScreen() {
             returnKeyType="next"
           />
         )}
-        <TextInput
-          style={[styles.addInput, { flex: 1 }]}
-          value={newItem}
-          onChangeText={setNewItem}
-          placeholder="新增項目..."
-          placeholderTextColor={Colors.textLight}
-          onSubmitEditing={handleAdd}
-          returnKeyType="done"
-        />
-        <TouchableOpacity style={styles.memberBtn} onPress={() => setMemberPickerOpen(true)}>
-          <Text style={styles.memberBtnText}>
-            {selectedMembers.length === 0 ? '👥' : `${selectedMembers.length}人`}
-          </Text>
-        </TouchableOpacity>
-        {activeTab === 'shopping' && (
-          <TouchableOpacity style={styles.photoBtn} onPress={pendingImage ? removePendingImage : pickImage}>
-            {pendingImage ? (
-              <>
-                <Image source={{ uri: pendingImage.previewUrl }} style={styles.photoBtnThumb} />
-                <View style={styles.photoBtnRemoveBadge}>
-                  <Text style={styles.photoBtnRemoveText}>✕</Text>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.photoBtnEmoji}>📷</Text>
-            )}
+        <View style={styles.addBarRow}>
+          <TextInput
+            style={[styles.addInput, { flex: 1 }]}
+            value={newItem}
+            onChangeText={setNewItem}
+            placeholder="新增項目..."
+            placeholderTextColor={Colors.textLight}
+            onSubmitEditing={handleAdd}
+            returnKeyType="done"
+          />
+          <TouchableOpacity style={styles.memberBtn} onPress={() => setMemberPickerOpen(true)}>
+            <Text style={styles.memberBtnText}>
+              {selectedMembers.length === 0 ? '👥' : `${selectedMembers.length}人`}
+            </Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={uploadingImage}>
-          {uploadingImage ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="add" size={24} color="#fff" />}
-        </TouchableOpacity>
+          {activeTab === 'shopping' && (
+            <TouchableOpacity style={styles.photoBtn} onPress={pendingImage ? removePendingImage : pickImage}>
+              {pendingImage ? (
+                <>
+                  <Image source={{ uri: pendingImage.previewUrl }} style={styles.photoBtnThumb} />
+                  <View style={styles.photoBtnRemoveBadge}>
+                    <Text style={styles.photoBtnRemoveText}>✕</Text>
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.photoBtnEmoji}>📷</Text>
+              )}
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={uploadingImage}>
+            {uploadingImage ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="add" size={24} color="#fff" />}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 成員選擇 Modal */}
@@ -410,9 +412,10 @@ const styles = StyleSheet.create({
   suggestionTitle: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500', marginBottom: 10 },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.background },
   suggestionText: { fontSize: 14, color: Colors.textSecondary },
-  addBar: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8, paddingBottom: 28, alignItems: 'center' },
+  addBar: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card, borderTopWidth: 1, borderTopColor: Colors.border, gap: 8, paddingBottom: 28 },
+  addBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addInput: { height: 44, backgroundColor: Colors.background, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: Colors.text },
-  shopInput: { width: 88 },
+  shopInputFull: { width: '100%' },
   memberBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
   memberBtnText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
   photoBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },

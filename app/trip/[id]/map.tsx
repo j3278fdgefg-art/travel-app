@@ -180,7 +180,15 @@ export default function MapScreen() {
   const [showFav, setShowFav] = useState(false);
   const [showRoute, setShowRoute] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [favCatFilter, setFavCatFilter] = useState<string>('all');
+  const [checkedCats, setCheckedCats] = useState<Set<string>>(new Set());
+  const [catFilterOpen, setCatFilterOpen] = useState(false);
+  const toggleCatFilter = (cat: string) => {
+    setCheckedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  };
   const [favPickerVisible, setFavPickerVisible] = useState(false);
   const [favPickerInput, setFavPickerInput] = useState('');
   const [pendingFavPlace, setPendingFavPlace] = useState<any | null>(null);
@@ -388,7 +396,9 @@ export default function MapScreen() {
     const g = (window as any).google;
     favMarkersRef.current.forEach((m) => m.setMap(null));
     favMarkersRef.current = [];
-    favorites.filter((f) => !f.is_header && f.lat != null && f.lng != null).forEach((f) => {
+    favorites.filter((f) => !f.is_header && f.lat != null && f.lng != null)
+      .filter((f) => checkedCats.size === 0 || checkedCats.has(f.category || ''))
+      .forEach((f) => {
       const marker = new g.maps.Marker({
         position: { lat: f.lat!, lng: f.lng! },
         map: showFavMarkersRef.current ? mapRef.current : null,
@@ -409,7 +419,7 @@ export default function MapScreen() {
       });
       favMarkersRef.current.push(marker);
     });
-  }, [gLoaded, favorites]);
+  }, [gLoaded, favorites, checkedCats]);
 
   // query 改變 → 平移地圖（點地點卡片 / 定位）
   useEffect(() => {
@@ -574,9 +584,8 @@ export default function MapScreen() {
   ));
   const filteredFavs = favorites.filter((f) => {
     if (f.is_header) return false;
-    if (favCatFilter === 'all') return true;
-    if (favCatFilter === '') return !f.category;
-    return f.category === favCatFilter;
+    if (checkedCats.size === 0) return true;
+    return checkedCats.has(f.category || '');
   });
   const findFav = (p: any) => favorites.find((f) => !f.is_header && ((p.placeId && f.place_id === p.placeId) || f.name === p.name));
   const toggleFav = (p: any) => {
@@ -870,17 +879,28 @@ export default function MapScreen() {
               <Text style={styles.drawerCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
-          {/* 分類篩選 chips */}
+          {/* 分類篩選：下拉勾選清單，都沒勾就是顯示全部 */}
           {uniqueCategories.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catFilterRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
-              {(['all', '', ...uniqueCategories] as string[]).map((cat, idx) => (
-                <TouchableOpacity key={idx} style={[styles.catFilterChip, favCatFilter === cat && styles.catFilterChipActive]} onPress={() => setFavCatFilter(cat)}>
-                  <Text style={[styles.catFilterText, favCatFilter === cat && styles.catFilterTextActive]}>
-                    {cat === 'all' ? '全部' : cat === '' ? '未分類' : cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={{ paddingHorizontal: 12, marginBottom: 6 }}>
+              <TouchableOpacity style={styles.catFilterToggle} onPress={() => setCatFilterOpen((v) => !v)}>
+                <Text style={styles.catFilterToggleText}>
+                  篩選分類{checkedCats.size > 0 ? `（已選 ${checkedCats.size}）` : '（全部）'}
+                </Text>
+                <Text style={styles.catFilterToggleArrow}>{catFilterOpen ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+              {catFilterOpen && (
+                <ScrollView style={styles.catFilterDropdown}>
+                  {(['', ...uniqueCategories] as string[]).map((cat, idx) => (
+                    <TouchableOpacity key={idx} style={styles.catFilterOption} onPress={() => toggleCatFilter(cat)}>
+                      <View style={[styles.catCheckbox, checkedCats.has(cat) && styles.catCheckboxChecked]}>
+                        {checkedCats.has(cat) && <Text style={styles.catCheckboxMark}>✓</Text>}
+                      </View>
+                      <Text style={styles.catFilterOptionText}>{cat === '' ? '未分類' : cat}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
           )}
           {filteredFavs.length === 0 ? (
             <Text style={styles.favEmpty}>{favorites.filter((f) => !f.is_header).length === 0 ? '還沒有收藏。\n點地圖上的店家，按 🤍 即可收藏。' : '此分類沒有收藏。'}</Text>
@@ -1115,11 +1135,15 @@ const styles = StyleSheet.create({
   favSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.primary + '15', borderRadius: 10 },
   favSectionText: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.primary },
   favSectionChevron: { fontSize: 11, color: Colors.primary },
-  catFilterRow: { maxHeight: 44, flexShrink: 0 },
-  catFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border, borderWidth: 1, borderColor: Colors.border },
-  catFilterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  catFilterText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
-  catFilterTextActive: { color: '#fff' },
+  catFilterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 36, borderRadius: 10, backgroundColor: Colors.border },
+  catFilterToggleText: { fontSize: 12, color: Colors.text, fontWeight: '600' },
+  catFilterToggleArrow: { fontSize: 10, color: Colors.textSecondary },
+  catFilterDropdown: { marginTop: 4, borderRadius: 10, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border, maxHeight: 160, overflow: 'hidden' },
+  catFilterOption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  catCheckbox: { width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  catCheckboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  catCheckboxMark: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  catFilterOptionText: { fontSize: 13, color: Colors.text },
   catPickerBar: { padding: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.background },
   catPickerTitle: { fontSize: 13, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border, marginRight: 8 },

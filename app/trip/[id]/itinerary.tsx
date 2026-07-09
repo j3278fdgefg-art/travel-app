@@ -228,6 +228,21 @@ function saveItemTypes(userId: string, list: string[]) {
   localStorage.setItem(`item_types_${userId}`, JSON.stringify(list));
 }
 
+const favCatSelectStyle: any = {
+  height: 40, borderRadius: 10, border: `1px solid ${Colors.border}`,
+  paddingLeft: 10, paddingRight: 10, fontSize: 14, color: Colors.text,
+  backgroundColor: Colors.background, marginHorizontal: 4, marginVertical: 8,
+  fontFamily: 'inherit',
+};
+
+function loadFavCatFilter(tripId: string): string {
+  try { return localStorage.getItem(`fav_cat_filter_${tripId}`) || 'all'; }
+  catch { return 'all'; }
+}
+function saveFavCatFilter(tripId: string, cat: string) {
+  try { localStorage.setItem(`fav_cat_filter_${tripId}`, cat); } catch {}
+}
+
 
 
 const emptyForm = () => ({
@@ -268,6 +283,12 @@ export default function ItineraryScreen() {
   const minInputRef = useRef<any>(null);
 
   useEffect(() => { if (id) { fetchTripById(id); fetchDays(id); fetchItems(id); fetchFavorites(id); fetchMembers(id); } }, [id]);
+  useEffect(() => { if (id) setFavCatFilter(loadFavCatFilter(id)); }, [id]);
+
+  const selectFavCat = (cat: string) => {
+    setFavCatFilter(cat);
+    if (id) saveFavCatFilter(id, cat);
+  };
 
   useEffect(() => {
     if (user) setItemTypes(loadItemTypes(user.id));
@@ -655,15 +676,29 @@ export default function ItineraryScreen() {
               return (
                 <View style={{ marginTop: 4 }}>
                   {favCats.length > 0 && (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.favCatRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 4, paddingVertical: 8 }}>
-                      {(['all', '', ...favCats] as string[]).map((cat, idx) => (
-                        <TouchableOpacity key={idx} style={[styles.favCatChip, favCatFilter === cat && styles.favCatChipActive]} onPress={() => setFavCatFilter(cat)}>
-                          <Text style={[styles.favCatChipText, favCatFilter === cat && styles.favCatChipTextActive]}>
+                    Platform.OS === 'web' ? (
+                      <select
+                        value={favCatFilter}
+                        onChange={(e: any) => selectFavCat(e.target.value)}
+                        style={favCatSelectStyle}
+                      >
+                        {(['all', '', ...favCats] as string[]).map((cat, idx) => (
+                          <option key={idx} value={cat}>
                             {cat === 'all' ? '全部' : cat === '' ? '未分類' : cat}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.favCatRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 4, paddingVertical: 8 }}>
+                        {(['all', '', ...favCats] as string[]).map((cat, idx) => (
+                          <TouchableOpacity key={idx} style={[styles.favCatChip, favCatFilter === cat && styles.favCatChipActive]} onPress={() => selectFavCat(cat)}>
+                            <Text style={[styles.favCatChipText, favCatFilter === cat && styles.favCatChipTextActive]}>
+                              {cat === 'all' ? '全部' : cat === '' ? '未分類' : cat}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )
                   )}
                   {realFavs.length === 0 ? (
                     <Text style={styles.favPickEmpty}>還沒有收藏。到地圖頁點店家、按 🤍 收藏後，這裡就能直接選用。</Text>
